@@ -129,40 +129,50 @@ export default function TelegramLogin({
     // Очищаем контейнер
     containerRef.current.innerHTML = ''
 
-    // Создаем div для виджета с data-атрибутами
-    // Telegram Widget автоматически найдет все div с data-telegram-login и инициализирует их
-    const widgetDiv = document.createElement('div')
-    widgetDiv.setAttribute('data-telegram-login', botName)
-    widgetDiv.setAttribute('data-size', buttonSize)
-    widgetDiv.setAttribute('data-corner-radius', cornerRadius.toString())
-    if (requestAccess) {
-      widgetDiv.setAttribute('data-request-access', 'write')
-    }
-    widgetDiv.setAttribute('data-userpic', usePic.toString())
-    widgetDiv.setAttribute('data-onauth', 'onTelegramAuth(user)')
-    
-    containerRef.current.appendChild(widgetDiv)
+    // Загружаем скрипт виджета сначала
+    const loadWidget = () => {
+      if (!containerRef.current) return
 
-    // Загружаем скрипт виджета (если еще не загружен)
-    let script = document.querySelector('script[src*="telegram-widget.js"]') as HTMLScriptElement
+      // Создаем div для виджета с data-атрибутами
+      const widgetDiv = document.createElement('div')
+      widgetDiv.setAttribute('data-telegram-login', botName)
+      widgetDiv.setAttribute('data-size', buttonSize)
+      widgetDiv.setAttribute('data-corner-radius', cornerRadius.toString())
+      if (requestAccess) {
+        widgetDiv.setAttribute('data-request-access', 'write')
+      }
+      widgetDiv.setAttribute('data-userpic', usePic.toString())
+      widgetDiv.setAttribute('data-onauth', 'onTelegramAuth(user)')
+      
+      containerRef.current.appendChild(widgetDiv)
+      console.log('Widget div created with bot:', botName)
+    }
+
+    // Проверяем, загружен ли уже скрипт
+    const existingScript = document.querySelector('script[src*="telegram-widget.js"]') as HTMLScriptElement
     
-    if (!script) {
-      script = document.createElement('script')
+    if (existingScript && existingScript.readyState === 'complete') {
+      // Скрипт уже загружен, создаем виджет сразу
+      loadWidget()
+    } else {
+      // Загружаем скрипт
+      const script = document.createElement('script')
       script.src = 'https://telegram.org/js/telegram-widget.js?22'
       script.async = true
       
       script.onload = () => {
-        console.log('Telegram widget script loaded')
-      }
-      script.onerror = () => {
-        console.error('Failed to load Telegram widget script')
+        console.log('Telegram widget script loaded, creating widget')
+        loadWidget()
       }
       
-      // Добавляем скрипт в head или body
+      script.onerror = () => {
+        console.error('Failed to load Telegram widget script')
+        if (containerRef.current) {
+          containerRef.current.innerHTML = '<p style="color: red;">Ошибка загрузки виджета Telegram</p>'
+        }
+      }
+      
       document.head.appendChild(script)
-    } else {
-      // Если скрипт уже загружен, виджет должен автоматически инициализироваться
-      console.log('Telegram widget script already loaded')
     }
 
     return () => {
