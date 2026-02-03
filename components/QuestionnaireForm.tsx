@@ -316,10 +316,8 @@ export default function QuestionnaireForm({
           {!telegramUser && (
             <div className="form-group" style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid #e0e0e0' }}>
               <h2>Авторизация через Telegram</h2>
-            
-            ) : (
-              <div>
-                {typeof window !== 'undefined' && window.Telegram?.WebApp ? (
+              
+              {typeof window !== 'undefined' && window.Telegram?.WebApp ? (
                   <div style={{ 
                     padding: '1.5rem', 
                     background: '#fff3cd', 
@@ -406,9 +404,13 @@ export default function QuestionnaireForm({
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
         </div>
       </div>
     </>
