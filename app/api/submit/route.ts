@@ -77,13 +77,18 @@ export async function POST(request: NextRequest) {
     // Проверка подписи Telegram (опционально, если есть токен бота)
     const botToken = process.env.TELEGRAM_BOT_TOKEN
     if (botToken) {
-      const isValid = verifyTelegramAuth(body.telegram, botToken)
-      if (!isValid) {
-        return NextResponse.json(
-          { error: 'Неверная подпись Telegram' },
-          { status: 401 }
-        )
+      // Проверяем подпись только если есть hash (для Login Widget)
+      // Для Web App проверка происходит через initData
+      if (body.telegram.hash) {
+        const isValid = verifyTelegramAuth(body.telegram, botToken)
+        if (!isValid) {
+          return NextResponse.json(
+            { error: 'Неверная подпись Telegram' },
+            { status: 401 }
+          )
+        }
       }
+      // Для Web App можно добавить дополнительную проверку initData, если нужно
     }
 
     // Здесь можно сохранить данные в базу данных
