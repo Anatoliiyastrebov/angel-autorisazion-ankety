@@ -42,7 +42,6 @@ export default function QuestionnaireForm({
 }: QuestionnaireFormProps) {
   const router = useRouter()
   const questions = questionnaireQuestions[questionnaireType] || []
-  const [currentStep, setCurrentStep] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [telegramUser, setTelegramUser] = useState<any | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -125,18 +124,6 @@ export default function QuestionnaireForm({
     }))
   }
 
-  const handleNext = () => {
-    if (currentStep < questions.length - 1) {
-      setCurrentStep(currentStep + 1)
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1)
-    }
-  }
-
   const handleSubmit = async () => {
     // Проверяем, что все вопросы заполнены
     const unansweredQuestions = questions.filter((q) => !answers[q.id] || answers[q.id].trim() === '')
@@ -215,45 +202,36 @@ export default function QuestionnaireForm({
 
           {error && <div className="error-message">{error}</div>}
 
-          {/* Индикатор прогресса */}
+          {/* Вопросы анкеты - все на одной странице */}
           {questions.length > 0 && (
-            <div className="step-indicator" style={{ marginTop: '1rem', marginBottom: '2rem' }}>
-              {questions.map((_, index) => (
-                <div
-                  key={index}
-                  className={`step ${index === currentStep ? 'active' : index < currentStep ? 'completed' : ''}`}
-                >
-                  {index + 1}
+            <div style={{ marginTop: '2rem' }}>
+              <h2 style={{ marginBottom: '1.5rem' }}>Заполните анкету</h2>
+              {questions.map((question) => (
+                <div key={question.id} className="form-group" style={{ marginBottom: '1.5rem' }}>
+                  <label htmlFor={question.id}>
+                    {question.label}
+                    {!answers[question.id] && <span style={{ color: 'red' }}> *</span>}
+                  </label>
+                  
+                  {question.type === 'number' ? (
+                    <input
+                      id={question.id}
+                      type="number"
+                      value={answers[question.id] || ''}
+                      onChange={(e) => handleInputChange(question.id, e.target.value)}
+                      required
+                    />
+                  ) : (
+                    <input
+                      id={question.id}
+                      type="text"
+                      value={answers[question.id] || ''}
+                      onChange={(e) => handleInputChange(question.id, e.target.value)}
+                      required
+                    />
+                  )}
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* Вопросы анкеты */}
-          {questions.length > 0 && questions[currentStep] && (
-            <div className="form-group">
-              <label htmlFor={questions[currentStep].id}>
-                {questions[currentStep].label}
-                {!answers[questions[currentStep].id] && <span style={{ color: 'red' }}> *</span>}
-              </label>
-              
-              {questions[currentStep].type === 'number' ? (
-                <input
-                  id={questions[currentStep].id}
-                  type="number"
-                  value={answers[questions[currentStep].id] || ''}
-                  onChange={(e) => handleInputChange(questions[currentStep].id, e.target.value)}
-                  required
-                />
-              ) : (
-                <input
-                  id={questions[currentStep].id}
-                  type="text"
-                  value={answers[questions[currentStep].id] || ''}
-                  onChange={(e) => handleInputChange(questions[currentStep].id, e.target.value)}
-                  required
-                />
-              )}
             </div>
           )}
 
@@ -281,34 +259,17 @@ export default function QuestionnaireForm({
             </div>
           )}
 
-          {/* Навигация по шагам */}
-          {questions.length > 0 && (
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'space-between' }}>
+          {/* Кнопка отправки */}
+          {questions.length > 0 && telegramUser && (
+            <div style={{ marginTop: '2rem' }}>
               <button
-                className="button button-secondary"
-                onClick={handlePrevious}
-                disabled={currentStep === 0}
+                className="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                style={{ width: '100%' }}
               >
-                Назад
+                {isSubmitting ? 'Отправка...' : 'Отправить анкету'}
               </button>
-              
-              {currentStep < questions.length - 1 ? (
-                <button
-                  className="button"
-                  onClick={handleNext}
-                  disabled={!answers[questions[currentStep].id] || answers[questions[currentStep].id].trim() === ''}
-                >
-                  Далее
-                </button>
-              ) : (
-                <button
-                  className="button"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting || !telegramUser}
-                >
-                  {isSubmitting ? 'Отправка...' : 'Отправить анкету'}
-                </button>
-              )}
             </div>
           )}
 
