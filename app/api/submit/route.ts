@@ -9,6 +9,7 @@ interface TelegramData {
   photo_url?: string
   auth_date: number
   hash: string
+  initData?: string // Оригинальная строка initData для Web App
 }
 
 interface SubmitRequest {
@@ -18,6 +19,12 @@ interface SubmitRequest {
 
 function verifyTelegramAuth(data: TelegramData, botToken: string): boolean {
   try {
+    // Если есть initData (из Web App), используем его для проверки
+    if (data.initData) {
+      return verifyTelegramWebApp(data.initData, botToken, data.auth_date)
+    }
+    
+    // Иначе проверяем как Login Widget
     const { hash, ...userData } = data
     
     // Создаем data-check-string из всех полей кроме hash
@@ -45,6 +52,7 @@ function verifyTelegramAuth(data: TelegramData, botToken: string): boolean {
 
     // Проверяем, что hash совпадает
     if (calculatedHash !== hash) {
+      console.error('❌ Hash mismatch. Calculated:', calculatedHash, 'Received:', hash)
       return false
     }
 
@@ -52,12 +60,67 @@ function verifyTelegramAuth(data: TelegramData, botToken: string): boolean {
     const currentTime = Math.floor(Date.now() / 1000)
     const authDate = data.auth_date
     if (currentTime - authDate > 86400) {
+      console.error('❌ Auth data is too old. Current:', currentTime, 'Auth Date:', authDate)
       return false
     }
 
     return true
   } catch (error) {
-    console.error('Error verifying Telegram auth:', error)
+    console.error('❌ Error verifying Telegram auth:', error)
+    return false
+  }
+}
+
+function verifyTelegramWebApp(initData: string, botToken: string, authDate: number): boolean {
+  try {
+    // Парсим initData (формат: key1=value1&key2=value2&hash=...)
+    const params = new URLSearchParams(initData)
+    const receivedHash = params.get('hash')
+    
+    if (!receivedHash) {
+      console.error('❌ Hash not found in initData')
+      return false
+    }
+    
+    // Удаляем hash из параметров
+    params.delete('hash')
+    
+    // Создаем data-check-string из всех параметров, отсортированных по ключу
+    const dataCheckString = Array.from(params.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}=${value}`)
+      .join('\n')
+    
+    // Создаем секретный ключ из токена бота
+    const secretKey = crypto
+      .createHash('sha256')
+      .update(botToken)
+      .digest()
+    
+    // Вычисляем HMAC-SHA256
+    const calculatedHash = crypto
+      .createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest('hex')
+    
+    // Проверяем, что hash совпадает
+    if (calculatedHash !== receivedHash) {
+      console.error('❌ Web App hash mismatch. Calculated:', calculatedHash, 'Received:', receivedHash)
+      console.error('❌ Data check string:', dataCheckString)
+      return false
+    }
+    
+    // Проверяем, что данные не устарели (не старше 24 часов)
+    const currentTime = Math.floor(Date.now() / 1000)
+    if (currentTime - authDate > 86400) {
+      console.error('❌ Web App auth data is too old. Current:', currentTime, 'Auth Date:', authDate)
+      return false
+    }
+    
+    console.log('✅ Web App signature verified successfully')
+    return true
+  } catch (error) {
+    console.error('❌ Error verifying Telegram Web App:', error)
     return false
   }
 }

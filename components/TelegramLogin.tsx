@@ -34,6 +34,7 @@ export interface TelegramUser {
   photo_url?: string
   auth_date: number
   hash: string
+  initData?: string // Оригинальная строка initData для Web App
 }
 
 interface TelegramLoginProps {
@@ -65,6 +66,7 @@ export default function TelegramLogin({
     if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
       const webAppUser = window.Telegram.WebApp.initDataUnsafe.user
       const initData = window.Telegram.WebApp.initDataUnsafe
+      const initDataString = window.Telegram.WebApp.initData // Оригинальная строка
       
       if (webAppUser && initData.auth_date && initData.hash) {
         setIsWebApp(true)
@@ -77,6 +79,7 @@ export default function TelegramLogin({
           photo_url: webAppUser.photo_url,
           auth_date: initData.auth_date,
           hash: initData.hash,
+          initData: initDataString, // Сохраняем оригинальную строку для проверки
         }
         
         window.Telegram.WebApp.ready()

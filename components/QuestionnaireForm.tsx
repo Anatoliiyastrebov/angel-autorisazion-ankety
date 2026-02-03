@@ -23,9 +23,10 @@ export default function QuestionnaireForm({
   // Проверяем Telegram Web App при загрузке компонента
   useEffect(() => {
     const checkWebApp = () => {
-      if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+      if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user) {
         const webAppUser = window.Telegram.WebApp.initDataUnsafe.user
         const initData = window.Telegram.WebApp.initDataUnsafe
+        const initDataString = window.Telegram.WebApp.initData // Оригинальная строка
         
         if (webAppUser && initData.auth_date && initData.hash) {
           const user: TelegramUser = {
@@ -36,6 +37,7 @@ export default function QuestionnaireForm({
             photo_url: webAppUser.photo_url,
             auth_date: initData.auth_date,
             hash: initData.hash,
+            initData: initDataString, // Сохраняем оригинальную строку для проверки
           }
           
           window.Telegram.WebApp.ready()
@@ -124,6 +126,7 @@ export default function QuestionnaireForm({
             photo_url: userToSubmit.photo_url,
             auth_date: userToSubmit.auth_date,
             hash: userToSubmit.hash,
+            initData: userToSubmit.initData, // Отправляем оригинальную строку initData для Web App
           },
         }),
       })
