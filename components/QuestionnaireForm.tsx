@@ -372,8 +372,3 @@ export default function QuestionnaireForm({
     </>
   )
 }
-        </div>
-      </div>
-    </>
-  )
-}
