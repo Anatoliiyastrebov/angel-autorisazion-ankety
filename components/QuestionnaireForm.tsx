@@ -42,6 +42,16 @@ export default function QuestionnaireForm({
 }: QuestionnaireFormProps) {
   const router = useRouter()
   const questions = questionnaireQuestions[questionnaireType] || []
+  
+  // Логирование для отладки
+  useEffect(() => {
+    console.log('📋 QuestionnaireForm loaded:', {
+      questionnaireType,
+      questionsCount: questions.length,
+      questions: questions
+    })
+  }, [questionnaireType, questions.length])
+  
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [telegramUser, setTelegramUser] = useState<any | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -206,10 +216,10 @@ export default function QuestionnaireForm({
           {error && <div className="error-message">{error}</div>}
 
           {/* Вопросы анкеты - все на одной странице */}
-          <div style={{ marginTop: '2rem' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>Заполните анкету</h2>
-            {questions.length > 0 ? (
-              questions.map((question) => (
+          {questions.length > 0 ? (
+            <div style={{ marginTop: '2rem' }}>
+              <h2 style={{ marginBottom: '1.5rem' }}>Заполните анкету</h2>
+              {questions.map((question) => (
                 <div key={question.id} className="form-group" style={{ marginBottom: '1.5rem' }}>
                   <label htmlFor={question.id}>
                     {question.label}
@@ -234,13 +244,21 @@ export default function QuestionnaireForm({
                     />
                   )}
                 </div>
-              ))
-            ) : (
-              <p style={{ color: '#666', textAlign: 'center', padding: '2rem' }}>
-                Загрузка вопросов анкеты...
+              ))}
+            </div>
+          ) : (
+            <div style={{ marginTop: '2rem', padding: '2rem', background: '#fff3cd', borderRadius: '8px', textAlign: 'center' }}>
+              <p style={{ color: '#856404', margin: 0, fontWeight: 500 }}>
+                ⚠️ Вопросы анкеты не загружены
               </p>
-            )}
-          </div>
+              <p style={{ color: '#856404', marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                Тип анкеты: <strong>{questionnaireType}</strong>
+              </p>
+              <p style={{ color: '#856404', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                Доступные типы: {Object.keys(questionnaireQuestions).join(', ')}
+              </p>
+            </div>
+          )}
 
           {/* Поле для связи (Telegram username) */}
           {telegramUser && (
