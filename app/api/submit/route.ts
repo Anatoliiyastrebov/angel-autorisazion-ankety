@@ -168,9 +168,7 @@ export async function POST(request: NextRequest) {
       const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
       
       // Формируем сообщение для администратора/группы
-      // Данные уже проверены выше, поэтому они достоверные
       let adminMessage = `🔔 Новая анкета!\n\n` +
-        `✅ Данные проверены через Telegram\n\n` +
         `📋 Тип анкеты: ${body.questionnaireType}\n` +
         `👤 Имя: ${body.telegram.first_name}${body.telegram.last_name ? ' ' + body.telegram.last_name : ''}\n` +
         `🆔 Username: ${verifiedUsername ? '@' + verifiedUsername : 'не указан'}\n` +
