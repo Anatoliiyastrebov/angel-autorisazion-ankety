@@ -57,67 +57,36 @@ export default function TelegramLogin({
   const [isWebApp, setIsWebApp] = useState(false)
 
   useEffect(() => {
-    if (!botName || botName === 'your_bot_name') {
+    if (!botName || botName === 'your_bot_name' || !containerRef.current) {
       return
     }
 
-    // Проверяем, открыт ли сайт через Telegram Web App
-    const checkTelegramWebApp = () => {
-      // Ждем загрузки Telegram Web App скрипта
-      const checkInterval = setInterval(() => {
-        if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
-          clearInterval(checkInterval)
-          
-          const webAppUser = window.Telegram.WebApp.initDataUnsafe.user
-          const initData = window.Telegram.WebApp.initDataUnsafe
-          
-          if (webAppUser && initData.auth_date && initData.hash) {
-            setIsWebApp(true)
-            
-            // Формируем объект пользователя из Web App
-            const user: TelegramUser = {
-              id: webAppUser.id,
-              first_name: webAppUser.first_name,
-              last_name: webAppUser.last_name,
-              username: webAppUser.username,
-              photo_url: webAppUser.photo_url,
-              auth_date: initData.auth_date,
-              hash: initData.hash,
-            }
-            
-            // Инициализируем Web App
-            window.Telegram.WebApp.ready()
-            window.Telegram.WebApp.expand()
-            
-            // Вызываем callback с данными пользователя
-            setTimeout(() => {
-              onAuth(user)
-            }, 100)
-          }
-        }
-      }, 100)
+    // Сначала проверяем Web App (быстрая проверка)
+    if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+      const webAppUser = window.Telegram.WebApp.initDataUnsafe.user
+      const initData = window.Telegram.WebApp.initDataUnsafe
       
-      // Останавливаем проверку через 5 секунд
-      setTimeout(() => {
-        clearInterval(checkInterval)
-      }, 5000)
-    }
-
-    // Проверяем, открыт ли сайт из Telegram (по user agent или наличию Telegram объекта)
-    const isInTelegram = 
-      window.Telegram?.WebApp !== undefined ||
-      navigator.userAgent.includes('Telegram') ||
-      window.location.search.includes('tgWebAppStartParam')
-    
-    if (isInTelegram) {
-      checkTelegramWebApp()
-      // Не показываем виджет, если открыто из Telegram
-      return
-    }
-
-    // Если не Web App, используем обычный виджет
-    if (!containerRef.current) {
-      return
+      if (webAppUser && initData.auth_date && initData.hash) {
+        setIsWebApp(true)
+        
+        const user: TelegramUser = {
+          id: webAppUser.id,
+          first_name: webAppUser.first_name,
+          last_name: webAppUser.last_name,
+          username: webAppUser.username,
+          photo_url: webAppUser.photo_url,
+          auth_date: initData.auth_date,
+          hash: initData.hash,
+        }
+        
+        window.Telegram.WebApp.ready()
+        window.Telegram.WebApp.expand()
+        
+        setTimeout(() => {
+          onAuth(user)
+        }, 100)
+        return
+      }
     }
 
     // Устанавливаем глобальный обработчик для Telegram Widget
@@ -129,50 +98,42 @@ export default function TelegramLogin({
     // Очищаем контейнер
     containerRef.current.innerHTML = ''
 
-    // Загружаем скрипт виджета сначала
-    const loadWidget = () => {
-      if (!containerRef.current) return
-
-      // Создаем div для виджета с data-атрибутами
-      const widgetDiv = document.createElement('div')
-      widgetDiv.setAttribute('data-telegram-login', botName)
-      widgetDiv.setAttribute('data-size', buttonSize)
-      widgetDiv.setAttribute('data-corner-radius', cornerRadius.toString())
-      if (requestAccess) {
-        widgetDiv.setAttribute('data-request-access', 'write')
-      }
-      widgetDiv.setAttribute('data-userpic', usePic.toString())
-      widgetDiv.setAttribute('data-onauth', 'onTelegramAuth(user)')
-      
-      containerRef.current.appendChild(widgetDiv)
-      console.log('Widget div created with bot:', botName)
+    // Создаем div для виджета с data-атрибутами
+    const widgetDiv = document.createElement('div')
+    widgetDiv.setAttribute('data-telegram-login', botName)
+    widgetDiv.setAttribute('data-size', buttonSize)
+    widgetDiv.setAttribute('data-corner-radius', cornerRadius.toString())
+    if (requestAccess) {
+      widgetDiv.setAttribute('data-request-access', 'write')
     }
+    widgetDiv.setAttribute('data-userpic', usePic.toString())
+    widgetDiv.setAttribute('data-onauth', 'onTelegramAuth(user)')
+    
+    containerRef.current.appendChild(widgetDiv)
+    console.log('Widget div created with bot:', botName)
 
-    // Проверяем, загружен ли уже скрипт
+    // Загружаем скрипт виджета
     const existingScript = document.querySelector('script[src*="telegram-widget.js"]') as HTMLScriptElement
     
-    if (existingScript && existingScript.readyState === 'complete') {
-      // Скрипт уже загружен, создаем виджет сразу
-      loadWidget()
-    } else {
-      // Загружаем скрипт
+    if (!existingScript) {
       const script = document.createElement('script')
       script.src = 'https://telegram.org/js/telegram-widget.js?22'
       script.async = true
       
       script.onload = () => {
-        console.log('Telegram widget script loaded, creating widget')
-        loadWidget()
+        console.log('✅ Telegram widget script loaded')
       }
       
       script.onerror = () => {
-        console.error('Failed to load Telegram widget script')
+        console.error('❌ Failed to load Telegram widget script')
         if (containerRef.current) {
-          containerRef.current.innerHTML = '<p style="color: red;">Ошибка загрузки виджета Telegram</p>'
+          containerRef.current.innerHTML = '<p style="color: red; padding: 1rem;">Ошибка загрузки виджета Telegram. Проверьте настройки бота.</p>'
         }
       }
       
       document.head.appendChild(script)
+    } else {
+      console.log('✅ Telegram widget script already loaded')
     }
 
     return () => {
