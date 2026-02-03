@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Отправляем сообщение боту с данными пользователя
-    if (botToken && body.telegram.id) {
+    if (botToken) {
       const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
       
       // Формируем сообщение для администратора/группы
@@ -115,12 +115,6 @@ export async function POST(request: NextRequest) {
         `🆔 Username: ${body.telegram.username ? '@' + body.telegram.username : 'не указан'}\n` +
         `🆔 ID: ${body.telegram.id}\n` +
         `🔗 Ссылка: ${body.telegram.username ? `https://t.me/${body.telegram.username}` : 'недоступна'}`
-
-      // Отправляем сообщение пользователю (подтверждение)
-      const userMessage = `✅ Спасибо за авторизацию!\n\n` +
-        `Ваши данные успешно получены.\n` +
-        `Анкета: ${body.questionnaireType}\n` +
-        `${body.telegram.username ? `Ваш Telegram: @${body.telegram.username}` : ''}`
 
       // Функция для отправки сообщения с обработкой ошибок
       const sendTelegramMessage = async (chatId: string | number, text: string, description: string) => {
@@ -139,30 +133,45 @@ export async function POST(request: NextRequest) {
           const result = await response.json()
           
           if (!response.ok || !result.ok) {
-            console.error(`Failed to send message to ${description}:`, result.description || result)
-            return false
+            console.error(`❌ Failed to send message to ${description} (${chatId}):`, result.description || result.error_code || result)
+            return { success: false, error: result.description || result.error_code || 'Unknown error' }
           }
           
-          console.log(`Message sent to ${description} successfully`)
-          return true
+          console.log(`✅ Message sent to ${description} (${chatId}) successfully`)
+          return { success: true }
         } catch (error) {
-          console.error(`Error sending message to ${description}:`, error)
-          return false
+          console.error(`❌ Error sending message to ${description} (${chatId}):`, error)
+          return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
         }
       }
 
-      // Отправляем сообщения параллельно
-      await Promise.allSettled([
-        sendTelegramMessage(body.telegram.id, userMessage, 'user'),
-        sendTelegramMessage(
-          process.env.TELEGRAM_GROUP_CHAT_ID || '-5074397630',
-          adminMessage,
-          'group'
-        ),
-        process.env.TELEGRAM_ADMIN_CHAT_ID
-          ? sendTelegramMessage(process.env.TELEGRAM_ADMIN_CHAT_ID, adminMessage, 'admin')
-          : Promise.resolve(false),
-      ])
+      // Отправляем в группу (обязательно)
+      const groupChatId = process.env.TELEGRAM_GROUP_CHAT_ID || '-5074397630'
+      const groupResult = await sendTelegramMessage(groupChatId, adminMessage, 'group')
+      
+      if (!groupResult.success) {
+        console.error('⚠️ Failed to send message to group, but continuing...')
+        // Не прерываем выполнение, но логируем ошибку
+      }
+
+      // Отправляем пользователю (только если это реальный Telegram ID, не временный)
+      // Проверяем, что ID не является временным (Date.now() создает очень большие числа)
+      const isRealTelegramId = body.telegram.id < 2147483647 // Максимальный реальный Telegram ID
+      if (isRealTelegramId && body.telegram.id) {
+        const userMessage = `✅ Спасибо за авторизацию!\n\n` +
+          `Ваши данные успешно получены.\n` +
+          `Анкета: ${body.questionnaireType}\n` +
+          `${body.telegram.username ? `Ваш Telegram: @${body.telegram.username}` : ''}`
+        
+        await sendTelegramMessage(body.telegram.id, userMessage, 'user')
+      }
+
+      // Отправляем администратору (если указан)
+      if (process.env.TELEGRAM_ADMIN_CHAT_ID) {
+        await sendTelegramMessage(process.env.TELEGRAM_ADMIN_CHAT_ID, adminMessage, 'admin')
+      }
+    } else {
+      console.error('⚠️ TELEGRAM_BOT_TOKEN not set, cannot send messages')
     }
 
     return NextResponse.json({
