@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import TelegramLogin, { TelegramUser } from './TelegramLogin'
-import SimpleTelegramAuth, { SimpleTelegramUser } from './SimpleTelegramAuth'
 import { useRouter } from 'next/navigation'
 
 interface QuestionnaireFormProps {
@@ -25,8 +23,7 @@ export default function QuestionnaireForm({
   const router = useRouter()
   const questions = questionnaireQuestions[questionnaireType] || []
   const [answers, setAnswers] = useState<Record<string, string>>({})
-  const [telegramUser, setTelegramUser] = useState<TelegramUser | SimpleTelegramUser | null>(null)
-  const [useSimpleAuth, setUseSimpleAuth] = useState(false)
+  const [telegramUser, setTelegramUser] = useState<any | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -65,7 +62,7 @@ export default function QuestionnaireForm({
         
         console.log('✅ Telegram Web App: user data loaded')
         
-        const user: TelegramUser = {
+        const user = {
           id: webAppUser.id,
           first_name: webAppUser.first_name,
           last_name: webAppUser.last_name,
@@ -73,7 +70,7 @@ export default function QuestionnaireForm({
           photo_url: webAppUser.photo_url,
           auth_date: initData.auth_date,
           hash: initData.hash,
-          initData: initDataString, // Сохраняем оригинальную строку для проверки
+          initData: initDataString,
         }
         
         // Автоматически сохраняем данные пользователя (без показа модального окна)
@@ -104,22 +101,6 @@ export default function QuestionnaireForm({
     }
   }, [])
 
-  const handleTelegramAuth = (user: TelegramUser) => {
-    console.log('🟢 handleTelegramAuth called with user:', user)
-    
-    // Сохраняем данные пользователя (без проверки hash, так как проверки убраны)
-    setTelegramUser(user)
-    setError(null)
-    console.log('✅ Telegram авторизация успешна:', user.first_name, user.username)
-  }
-
-  const handleSimpleAuth = (user: SimpleTelegramUser) => {
-    console.log('🟢 Simple auth called with user:', user)
-    setTelegramUser(user)
-    setError(null)
-    setUseSimpleAuth(false)
-    console.log('✅ Простая авторизация успешна:', user.first_name, user.username)
-  }
 
 
   const handleSubmit = async () => {
@@ -149,14 +130,14 @@ export default function QuestionnaireForm({
           questionnaireType,
           answers: answers || {},
           telegram: {
-            id: typeof telegramUser.id === 'number' ? telegramUser.id : parseInt(telegramUser.id.replace('temp_', '')) || Date.now(),
+            id: telegramUser.id,
             username: telegramUser.username,
             first_name: telegramUser.first_name,
             last_name: telegramUser.last_name || undefined,
-            photo_url: 'photo_url' in telegramUser ? telegramUser.photo_url : undefined,
-            auth_date: 'auth_date' in telegramUser ? telegramUser.auth_date : Math.floor(Date.now() / 1000),
-            hash: 'hash' in telegramUser ? telegramUser.hash || '' : '',
-            initData: 'initData' in telegramUser ? telegramUser.initData || '' : '',
+            photo_url: telegramUser.photo_url || undefined,
+            auth_date: telegramUser.auth_date || Math.floor(Date.now() / 1000),
+            hash: telegramUser.hash || '',
+            initData: telegramUser.initData || '',
           },
         }),
       })
@@ -235,17 +216,6 @@ export default function QuestionnaireForm({
                   </button>
                 </div>
               </div>
-            ) : useSimpleAuth ? (
-              <div>
-                <SimpleTelegramAuth onAuth={handleSimpleAuth} />
-                <button
-                  className="button button-secondary"
-                  onClick={() => setUseSimpleAuth(false)}
-                  style={{ width: '100%', marginTop: '1rem' }}
-                >
-                  Вернуться к авторизации через Telegram
-                </button>
-              </div>
             ) : (
               <div>
                 {typeof window !== 'undefined' && window.Telegram?.WebApp ? (
@@ -275,18 +245,19 @@ export default function QuestionnaireForm({
                         width: '100%'
                       }}
                     >
-                      🔵 Войти через Telegram
+                      🔵 Открыть бота в Telegram
                     </a>
-                    <p style={{ fontSize: '0.85rem', color: '#856404', marginTop: '1rem', textAlign: 'center' }}>
-                      Или используйте форму ниже для ввода данных вручную
-                    </p>
-                    <button
-                      className="button button-secondary"
-                      onClick={() => setUseSimpleAuth(true)}
-                      style={{ width: '100%', marginTop: '0.5rem' }}
-                    >
-                      Ввести данные вручную
-                    </button>
+                    <div style={{ 
+                      padding: '1rem', 
+                      background: '#e7f3ff', 
+                      borderRadius: '8px',
+                      border: '1px solid #0088cc',
+                      marginTop: '1rem'
+                    }}>
+                      <p style={{ fontSize: '0.9rem', color: '#004085', textAlign: 'center', margin: 0 }}>
+                        💡 <strong>Инструкция:</strong> Нажмите кнопку выше, откройте бота в Telegram, затем используйте меню-кнопку для открытия анкеты. Данные загрузятся автоматически.
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div style={{ 
@@ -314,29 +285,24 @@ export default function QuestionnaireForm({
                         width: '100%'
                       }}
                     >
-                      🔵 Войти через Telegram
+                      🔵 Открыть бота в Telegram
                     </a>
                     <div style={{ 
                       padding: '1rem', 
                       background: '#e7f3ff', 
                       borderRadius: '8px',
-                      border: '1px solid #0088cc',
-                      marginBottom: '1rem'
+                      border: '1px solid #0088cc'
                     }}>
-                      <p style={{ fontSize: '0.9rem', color: '#004085', textAlign: 'center', margin: 0 }}>
-                        💡 <strong>Рекомендуется:</strong> Откройте бота в Telegram и используйте меню-кнопку для автоматической авторизации
+                      <p style={{ fontSize: '0.9rem', color: '#004085', textAlign: 'center', margin: 0, marginBottom: '0.5rem' }}>
+                        💡 <strong>Инструкция:</strong>
                       </p>
+                      <ol style={{ fontSize: '0.85rem', color: '#004085', textAlign: 'left', margin: 0, paddingLeft: '1.5rem' }}>
+                        <li>Нажмите кнопку выше, чтобы открыть бота в Telegram</li>
+                        <li>В боте нажмите на меню-кнопку (если настроена) или отправьте команду /start</li>
+                        <li>Анкета откроется с автоматической авторизацией</li>
+                        <li>Ваши данные из Telegram загрузятся автоматически</li>
+                      </ol>
                     </div>
-                    <p style={{ fontSize: '0.85rem', color: '#666', textAlign: 'center', marginBottom: '1rem' }}>
-                      Или введите данные вручную:
-                    </p>
-                    <button
-                      className="button button-secondary"
-                      onClick={() => setUseSimpleAuth(true)}
-                      style={{ width: '100%' }}
-                    >
-                      Ввести данные вручную
-                    </button>
                   </div>
                 )}
               </div>
