@@ -177,9 +177,17 @@ export async function POST(request: NextRequest) {
       
       // Добавляем ответы на вопросы анкеты, если они есть
       if (body.answers && Object.keys(body.answers).length > 0) {
-        adminMessage += `📝 Ответы на вопросы:\n`
+        adminMessage += `📝 Ответы на вопросы анкеты:\n`
+        // Маппинг ID вопросов на читаемые названия
+        const questionLabels: Record<string, string> = {
+          first_name: 'Имя',
+          last_name: 'Фамилия',
+          height: 'Рост (см)',
+          weight: 'Вес (кг)',
+        }
         for (const [questionId, answer] of Object.entries(body.answers)) {
-          adminMessage += `\n• ${questionId}: ${answer}`
+          const label = questionLabels[questionId] || questionId
+          adminMessage += `\n• ${label}: ${answer}`
         }
       }
 
