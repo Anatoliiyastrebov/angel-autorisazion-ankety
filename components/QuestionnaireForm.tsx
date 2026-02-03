@@ -326,7 +326,7 @@ export default function QuestionnaireForm({
                       Для автоматической авторизации откройте этот сайт из Telegram через бота или меню-кнопку.
                     </p>
                     <a
-                      href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || 'telega_automat_bot'}/auth/confirm?type=${questionnaireType}`}
+                      href={`${typeof window !== 'undefined' ? window.location.origin : ''}/auth/confirm?type=${questionnaireType}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="button"
@@ -366,7 +366,7 @@ export default function QuestionnaireForm({
                       Для автоматической авторизации откройте этот сайт из Telegram через бота. Ваши данные из Telegram будут использованы для связи с вами.
                     </p>
                     <a
-                      href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || 'telega_automat_bot'}/auth/confirm?type=${questionnaireType}`}
+                      href={`${typeof window !== 'undefined' ? window.location.origin : ''}/auth/confirm?type=${questionnaireType}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="button"

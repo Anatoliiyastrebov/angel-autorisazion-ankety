@@ -44,8 +44,19 @@ export default function AuthConfirmPage() {
     // Получаем тип анкеты из URL или используем по умолчанию
     const questionnaireType = searchParams.get('type') || 'women'
     
-    // Перенаправляем на страницу анкеты
-    router.push(`/questionnaire/${questionnaireType}?auth=confirmed`)
+    // Если открыто в Telegram Web App, открываем сайт в браузере
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+      const siteUrl = `${window.location.origin}/questionnaire/${questionnaireType}?auth=confirmed`
+      // Открываем сайт в браузере
+      window.open(siteUrl, '_blank')
+      // Закрываем Web App через небольшую задержку
+      setTimeout(() => {
+        window.Telegram.WebApp.close()
+      }, 500)
+    } else {
+      // Если не в Web App, просто перенаправляем
+      router.push(`/questionnaire/${questionnaireType}?auth=confirmed`)
+    }
   }
 
   if (!isAuthorized) {
