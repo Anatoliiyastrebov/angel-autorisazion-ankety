@@ -22,21 +22,27 @@ export default function QuestionnaireForm({
 
   // Проверяем Telegram Web App при загрузке компонента
   useEffect(() => {
+    let isMounted = true
     let isInitialized = false
     
     const initializeWebApp = () => {
-      // Предотвращаем множественную инициализацию
-      if (isInitialized || typeof window === 'undefined' || !window.Telegram?.WebApp) {
-        return
+      // Предотвращаем множественную инициализацию и работу после размонтирования
+      if (!isMounted || isInitialized || typeof window === 'undefined' || !window.Telegram?.WebApp) {
+        return false
       }
       
       const webApp = window.Telegram.WebApp
       
       // Инициализируем Web App только один раз
       if (!isInitialized) {
-        webApp.ready()
-        webApp.expand()
-        isInitialized = true
+        try {
+          webApp.ready()
+          webApp.expand()
+          isInitialized = true
+        } catch (error) {
+          console.error('Error initializing Web App:', error)
+          return false
+        }
       }
       
       // Проверяем наличие данных пользователя
@@ -45,6 +51,8 @@ export default function QuestionnaireForm({
       const initDataString = webApp.initData // Оригинальная строка
       
       if (webAppUser && initData?.auth_date && initData?.hash) {
+        if (!isMounted) return false // Компонент размонтирован
+        
         console.log('✅ Telegram Web App: user data loaded')
         
         const user: TelegramUser = {
@@ -69,17 +77,20 @@ export default function QuestionnaireForm({
 
     // Проверяем сразу
     if (initializeWebApp()) {
-      return // Данные уже загружены, выходим
+      return () => {
+        isMounted = false
+      }
     }
 
     // Если данные не загружены, проверяем через небольшую задержку
     const timer = setTimeout(() => {
-      if (!initializeWebApp()) {
+      if (isMounted && !initializeWebApp()) {
         console.log('ℹ️ Telegram Web App detected but user data not available')
       }
     }, 500)
 
     return () => {
+      isMounted = false
       clearTimeout(timer)
     }
   }, [])
