@@ -117,45 +117,69 @@ export async function POST(request: NextRequest) {
         `🔗 Ссылка: ${body.telegram.username ? `https://t.me/${body.telegram.username}` : 'недоступна'}`
 
       // Отправляем в группу напрямую через Telegram API
-      const groupChatId = process.env.TELEGRAM_GROUP_CHAT_ID || '-5074397630'
+      // Если группа была преобразована в супергруппу, используем migrate_to_chat_id из ошибки
+      let groupChatId = process.env.TELEGRAM_GROUP_CHAT_ID || '-5074397630'
+      let groupSent = false
+      let attempts = 0
+      const maxAttempts = 2
       
-      try {
-        const groupResponse = await fetch(telegramApiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chat_id: groupChatId,
-            text: adminMessage,
-          }),
-        })
-
-        const groupResult = await groupResponse.json()
-        
-        if (!groupResponse.ok || !groupResult.ok) {
-          console.error('❌ Ошибка отправки в группу:', {
-            chatId: groupChatId,
-            error: groupResult.description || groupResult.error_code,
-            fullResponse: groupResult
-          })
-          // Возвращаем ошибку, чтобы пользователь знал
-          return NextResponse.json(
-            { 
-              error: `Не удалось отправить сообщение в группу: ${groupResult.description || 'Неизвестная ошибка'}`,
-              details: groupResult
+      while (!groupSent && attempts < maxAttempts) {
+        try {
+          const groupResponse = await fetch(telegramApiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            { status: 500 }
-          )
+            body: JSON.stringify({
+              chat_id: groupChatId,
+              text: adminMessage,
+            }),
+          })
+
+          const groupResult = await groupResponse.json()
+          
+          if (groupResponse.ok && groupResult.ok) {
+            console.log('✅ Сообщение успешно отправлено в группу:', groupChatId)
+            groupSent = true
+          } else if (groupResult.error_code === 400 && groupResult.description?.includes('upgraded to a supergroup')) {
+            // Группа была преобразована в супергруппу, получаем новый ID
+            const migrateMatch = groupResult.parameters?.migrate_to_chat_id
+            if (migrateMatch) {
+              console.log(`🔄 Группа преобразована в супергруппу. Старый ID: ${groupChatId}, новый ID: ${migrateMatch}`)
+              groupChatId = migrateMatch.toString()
+              attempts++
+              // Продолжаем попытку с новым ID
+            } else {
+              console.error('❌ Группа преобразована, но новый ID не найден:', groupResult)
+              // Пробуем использовать стандартный формат для супергруппы (добавляем -100)
+              const oldId = parseInt(groupChatId.replace('-', ''))
+              if (!isNaN(oldId)) {
+                groupChatId = `-100${oldId}`
+                console.log(`🔄 Пробуем новый формат ID супергруппы: ${groupChatId}`)
+                attempts++
+              } else {
+                console.error('❌ Не удалось определить новый ID группы')
+                break
+              }
+            }
+          } else {
+            console.error('❌ Ошибка отправки в группу:', {
+              chatId: groupChatId,
+              error: groupResult.description || groupResult.error_code,
+              fullResponse: groupResult
+            })
+            // Для других ошибок не прерываем выполнение, но логируем
+            break
+          }
+        } catch (error) {
+          console.error('❌ Ошибка при отправке в группу:', error)
+          break
         }
-        
-        console.log('✅ Сообщение успешно отправлено в группу:', groupChatId)
-      } catch (error) {
-        console.error('❌ Ошибка при отправке в группу:', error)
-        return NextResponse.json(
-          { error: 'Ошибка при отправке сообщения в группу' },
-          { status: 500 }
-        )
+      }
+      
+      if (!groupSent) {
+        console.error('⚠️ Не удалось отправить сообщение в группу после всех попыток')
+        // Не возвращаем ошибку пользователю, но логируем для отладки
       }
 
       // Отправляем пользователю (только если это реальный Telegram ID)
