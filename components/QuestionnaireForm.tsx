@@ -262,7 +262,21 @@ export default function QuestionnaireForm({
                     <p style={{ fontSize: '0.9rem', color: '#856404', marginBottom: '1rem' }}>
                       Для автоматической авторизации откройте этот сайт из Telegram через бота или меню-кнопку.
                     </p>
-                    <p style={{ fontSize: '0.9rem', color: '#856404', fontWeight: 500 }}>
+                    <a
+                      href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || 'telega_automat_bot'}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="button"
+                      style={{ 
+                        display: 'inline-block', 
+                        marginBottom: '1rem',
+                        textDecoration: 'none',
+                        width: '100%'
+                      }}
+                    >
+                      🔵 Войти через Telegram
+                    </a>
+                    <p style={{ fontSize: '0.9rem', color: '#856404', fontWeight: 500, marginBottom: '1rem' }}>
                       Или используйте кнопку ниже для авторизации через Telegram Login Widget.
                     </p>
                     <div style={{ marginTop: '1rem' }}>
@@ -289,6 +303,24 @@ export default function QuestionnaireForm({
                     <p style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: '#666', textAlign: 'center' }}>
                       Нажмите кнопку ниже, чтобы войти через Telegram. Ваши данные из Telegram будут использованы для связи с вами.
                     </p>
+                    <a
+                      href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || 'telega_automat_bot'}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="button"
+                      style={{ 
+                        display: 'block', 
+                        marginBottom: '1rem',
+                        textDecoration: 'none',
+                        textAlign: 'center',
+                        width: '100%'
+                      }}
+                    >
+                      🔵 Войти через Telegram
+                    </a>
+                    <p style={{ fontSize: '0.85rem', color: '#999', textAlign: 'center', fontStyle: 'italic', marginBottom: '1rem' }}>
+                      💡 Или используйте виджет ниже для авторизации через браузер
+                    </p>
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
                       <TelegramLogin
                         botName={process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || 'telega_automat_bot'}
@@ -299,9 +331,6 @@ export default function QuestionnaireForm({
                         usePic={true}
                       />
                     </div>
-                    <p style={{ fontSize: '0.85rem', color: '#999', textAlign: 'center', fontStyle: 'italic', marginBottom: '1rem' }}>
-                      💡 Совет: Для автоматической авторизации откройте этот сайт из Telegram через бота
-                    </p>
                     <button
                       className="button button-secondary"
                       onClick={() => setUseSimpleAuth(true)}
