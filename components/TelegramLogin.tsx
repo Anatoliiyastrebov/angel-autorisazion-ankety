@@ -32,7 +32,7 @@ export default function TelegramLogin({
   onAuth,
   buttonSize = 'large',
   cornerRadius = 4,
-  requestAccess = true,
+  requestAccess = false,
   usePic = true,
 }: TelegramLoginProps) {
   const containerRef = useRef<HTMLDivElement>(null)

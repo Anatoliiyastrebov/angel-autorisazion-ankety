@@ -101,70 +101,63 @@ export async function POST(request: NextRequest) {
 
     // Отправляем сообщение боту с данными пользователя
     if (botToken && body.telegram.id) {
-      try {
-        const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
-        
-        // Формируем сообщение для администратора
-        const adminMessage = `🔔 Новая авторизация через анкету!\n\n` +
-          `📋 Тип анкеты: ${body.questionnaireType}\n` +
-          `👤 Имя: ${body.telegram.first_name}${body.telegram.last_name ? ' ' + body.telegram.last_name : ''}\n` +
-          `🆔 Username: ${body.telegram.username ? '@' + body.telegram.username : 'не указан'}\n` +
-          `🆔 ID: ${body.telegram.id}\n` +
-          `🔗 Ссылка: ${body.telegram.username ? `https://t.me/${body.telegram.username}` : 'недоступна'}`
+      const telegramApiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`
+      
+      // Формируем сообщение для администратора/группы
+      const adminMessage = `🔔 Новая авторизация через анкету!\n\n` +
+        `📋 Тип анкеты: ${body.questionnaireType}\n` +
+        `👤 Имя: ${body.telegram.first_name}${body.telegram.last_name ? ' ' + body.telegram.last_name : ''}\n` +
+        `🆔 Username: ${body.telegram.username ? '@' + body.telegram.username : 'не указан'}\n` +
+        `🆔 ID: ${body.telegram.id}\n` +
+        `🔗 Ссылка: ${body.telegram.username ? `https://t.me/${body.telegram.username}` : 'недоступна'}`
 
-        // Отправляем сообщение пользователю (подтверждение)
-        const userMessage = `✅ Спасибо за авторизацию!\n\n` +
-          `Ваши данные успешно получены.\n` +
-          `Анкета: ${body.questionnaireType}\n` +
-          `${body.telegram.username ? `Ваш Telegram: @${body.telegram.username}` : ''}`
+      // Отправляем сообщение пользователю (подтверждение)
+      const userMessage = `✅ Спасибо за авторизацию!\n\n` +
+        `Ваши данные успешно получены.\n` +
+        `Анкета: ${body.questionnaireType}\n` +
+        `${body.telegram.username ? `Ваш Telegram: @${body.telegram.username}` : ''}`
 
-        // Отправляем пользователю подтверждение
-        await fetch(telegramApiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chat_id: body.telegram.id,
-            text: userMessage,
-          }),
-        })
-
-        // Отправляем в группу (ID группы из переменных окружения или по умолчанию)
-        const groupChatId = process.env.TELEGRAM_GROUP_CHAT_ID || '-5074397630'
-        await fetch(telegramApiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chat_id: groupChatId,
-            text: adminMessage,
-          }),
-        })
-        console.log(`Message sent to group ${groupChatId} via Telegram Bot API`)
-
-        // Отправляем администратору (если указан ADMIN_CHAT_ID в переменных окружения)
-        const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID
-        if (adminChatId) {
-          await fetch(telegramApiUrl, {
+      // Функция для отправки сообщения с обработкой ошибок
+      const sendTelegramMessage = async (chatId: string | number, text: string, description: string) => {
+        try {
+          const response = await fetch(telegramApiUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              chat_id: adminChatId,
-              text: adminMessage,
+              chat_id: chatId,
+              text: text,
             }),
           })
-          console.log('Message sent to admin via Telegram Bot API')
-        }
 
-        console.log('Message sent to user via Telegram Bot API')
-      } catch (error) {
-        console.error('Error sending message to Telegram:', error)
-        // Не прерываем выполнение, если отправка сообщения не удалась
+          const result = await response.json()
+          
+          if (!response.ok || !result.ok) {
+            console.error(`Failed to send message to ${description}:`, result.description || result)
+            return false
+          }
+          
+          console.log(`Message sent to ${description} successfully`)
+          return true
+        } catch (error) {
+          console.error(`Error sending message to ${description}:`, error)
+          return false
+        }
       }
+
+      // Отправляем сообщения параллельно
+      await Promise.allSettled([
+        sendTelegramMessage(body.telegram.id, userMessage, 'user'),
+        sendTelegramMessage(
+          process.env.TELEGRAM_GROUP_CHAT_ID || '-5074397630',
+          adminMessage,
+          'group'
+        ),
+        process.env.TELEGRAM_ADMIN_CHAT_ID
+          ? sendTelegramMessage(process.env.TELEGRAM_ADMIN_CHAT_ID, adminMessage, 'admin')
+          : Promise.resolve(false),
+      ])
     }
 
     return NextResponse.json({
