@@ -63,42 +63,55 @@ export default function TelegramLogin({
 
     // Проверяем, открыт ли сайт через Telegram Web App
     const checkTelegramWebApp = () => {
-      if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
-        const webAppUser = window.Telegram.WebApp.initDataUnsafe.user
-        const initData = window.Telegram.WebApp.initDataUnsafe
-        
-        if (webAppUser && initData.auth_date && initData.hash) {
-          setIsWebApp(true)
+      // Ждем загрузки Telegram Web App скрипта
+      const checkInterval = setInterval(() => {
+        if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+          clearInterval(checkInterval)
           
-          // Формируем объект пользователя из Web App
-          const user: TelegramUser = {
-            id: webAppUser.id,
-            first_name: webAppUser.first_name,
-            last_name: webAppUser.last_name,
-            username: webAppUser.username,
-            photo_url: webAppUser.photo_url,
-            auth_date: initData.auth_date,
-            hash: initData.hash,
+          const webAppUser = window.Telegram.WebApp.initDataUnsafe.user
+          const initData = window.Telegram.WebApp.initDataUnsafe
+          
+          if (webAppUser && initData.auth_date && initData.hash) {
+            setIsWebApp(true)
+            
+            // Формируем объект пользователя из Web App
+            const user: TelegramUser = {
+              id: webAppUser.id,
+              first_name: webAppUser.first_name,
+              last_name: webAppUser.last_name,
+              username: webAppUser.username,
+              photo_url: webAppUser.photo_url,
+              auth_date: initData.auth_date,
+              hash: initData.hash,
+            }
+            
+            // Инициализируем Web App
+            window.Telegram.WebApp.ready()
+            window.Telegram.WebApp.expand()
+            
+            // Вызываем callback с данными пользователя
+            setTimeout(() => {
+              onAuth(user)
+            }, 100)
           }
-          
-          // Инициализируем Web App
-          window.Telegram.WebApp.ready()
-          window.Telegram.WebApp.expand()
-          
-          // Вызываем callback с данными пользователя
-          setTimeout(() => {
-            onAuth(user)
-          }, 100)
-          
-          return true
         }
-      }
-      return false
+      }, 100)
+      
+      // Останавливаем проверку через 5 секунд
+      setTimeout(() => {
+        clearInterval(checkInterval)
+      }, 5000)
     }
 
-    // Пытаемся использовать Web App (только если действительно открыто из Telegram)
-    const isInTelegram = window.Telegram?.WebApp?.initDataUnsafe?.user !== undefined
-    if (isInTelegram && checkTelegramWebApp()) {
+    // Проверяем, открыт ли сайт из Telegram (по user agent или наличию Telegram объекта)
+    const isInTelegram = 
+      window.Telegram?.WebApp !== undefined ||
+      navigator.userAgent.includes('Telegram') ||
+      window.location.search.includes('tgWebAppStartParam')
+    
+    if (isInTelegram) {
+      checkTelegramWebApp()
+      // Не показываем виджет, если открыто из Telegram
       return
     }
 
