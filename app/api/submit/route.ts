@@ -130,6 +130,20 @@ export async function POST(request: NextRequest) {
           }),
         })
 
+        // Отправляем в группу (ID группы из переменных окружения или по умолчанию)
+        const groupChatId = process.env.TELEGRAM_GROUP_CHAT_ID || '-5074397630'
+        await fetch(telegramApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chat_id: groupChatId,
+            text: adminMessage,
+          }),
+        })
+        console.log(`Message sent to group ${groupChatId} via Telegram Bot API`)
+
         // Отправляем администратору (если указан ADMIN_CHAT_ID в переменных окружения)
         const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID
         if (adminChatId) {
@@ -144,9 +158,6 @@ export async function POST(request: NextRequest) {
             }),
           })
           console.log('Message sent to admin via Telegram Bot API')
-        } else {
-          // Если ADMIN_CHAT_ID не указан, логируем сообщение
-          console.log('Admin message (ADMIN_CHAT_ID not set):', adminMessage)
         }
 
         console.log('Message sent to user via Telegram Bot API')
