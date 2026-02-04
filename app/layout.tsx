@@ -14,12 +14,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru">
-      <body>
-        {/* Telegram Web App Script - загружаем до интерактивности для корректной работы */}
-        <Script
+      <head>
+        {/* Telegram Web App Script - загружаем в head для ранней инициализации */}
+        <script
           src="https://telegram.org/js/telegram-web-app.js"
-          strategy="beforeInteractive"
         />
+      </head>
+      <body>
         {children}
       </body>
     </html>

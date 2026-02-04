@@ -19,6 +19,29 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
       
       // Проверяем Telegram Web App при загрузке
       checkTelegramWebApp()
+      
+      // Также проверяем после полной загрузки страницы
+      const handleLoad = () => {
+        console.log('📄 Страница полностью загружена, повторная проверка...')
+        setTimeout(() => {
+          checkTelegramWebApp()
+        }, 500)
+      }
+      
+      if (document.readyState === 'complete') {
+        handleLoad()
+      } else {
+        window.addEventListener('load', handleLoad)
+        return () => window.removeEventListener('load', handleLoad)
+      }
+      
+      // Дополнительная проверка через небольшое время (на случай, если скрипт загружается медленно)
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ Таймаут проверки, повторная попытка...')
+        checkTelegramWebApp()
+      }, 1000)
+      
+      return () => clearTimeout(timeoutId)
     }
   }, [])
 
@@ -29,9 +52,17 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
 
     // Ждем загрузки Telegram Web App скрипта
     const checkWebApp = () => {
+      console.log('🔍 Проверка Telegram Web App...')
+      
       // Проверяем, если открыто из Telegram Web App
       if (window.Telegram?.WebApp) {
         const webApp = window.Telegram.WebApp
+        console.log('✅ Telegram WebApp объект найден:', {
+          hasInitData: !!webApp.initData,
+          hasInitDataUnsafe: !!webApp.initDataUnsafe,
+          initDataLength: webApp.initData?.length || 0,
+          hasUser: !!webApp.initDataUnsafe?.user
+        })
         
         try {
           // Инициализируем Web App
@@ -50,9 +81,20 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
         const webAppUser = webApp.initDataUnsafe?.user
         const initData = webApp.initDataUnsafe
 
+        console.log('🔍 Данные initDataUnsafe:', {
+          hasUser: !!webAppUser,
+          hasAuthDate: !!initData?.auth_date,
+          hasHash: !!initData?.hash,
+          user: webAppUser ? {
+            id: webAppUser.id,
+            first_name: webAppUser.first_name,
+            username: webAppUser.username
+          } : null
+        })
+
         // Приоритет 1: Данные из initDataUnsafe (самый надежный способ)
         if (webAppUser && initData?.auth_date && initData?.hash) {
-          console.log('✅ Telegram Web App: данные пользователя найдены через initDataUnsafe')
+          console.log('✅ Telegram Web App: данные пользователя найдены через initDataUnsafe', webAppUser)
           const user: TelegramUser = {
             id: webAppUser.id,
             first_name: webAppUser.first_name,
@@ -64,10 +106,13 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
             initData: webApp.initData,
           }
           
+          console.log('✅ Создан объект пользователя:', user)
+          
           // Сохраняем в localStorage
           localStorage.setItem('telegram_user', JSON.stringify(user))
           
           // Вызываем callback
+          console.log('✅ Вызываем onAuth callback')
           onAuth(user)
           setIsChecking(false)
           return true
@@ -75,9 +120,19 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
 
         // Приоритет 2: Парсим initData строку
         if (webApp.initData) {
+          console.log('🔍 Парсим initData строку:', webApp.initData.substring(0, 100) + '...')
           try {
             const params = new URLSearchParams(webApp.initData)
             const userParam = params.get('user')
+            const authDate = params.get('auth_date')
+            const hash = params.get('hash')
+            
+            console.log('🔍 Параметры из initData:', {
+              hasUser: !!userParam,
+              hasAuthDate: !!authDate,
+              hasHash: !!hash
+            })
+            
             if (userParam) {
               const userData = JSON.parse(decodeURIComponent(userParam))
               console.log('✅ Найдены данные пользователя в initData:', userData)
@@ -88,22 +143,32 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
                 last_name: userData.last_name,
                 username: userData.username,
                 photo_url: userData.photo_url,
-                auth_date: parseInt(params.get('auth_date') || '0'),
-                hash: params.get('hash') || '',
+                auth_date: parseInt(authDate || '0'),
+                hash: hash || '',
                 initData: webApp.initData,
               }
               
               if (user.id && user.first_name) {
+                console.log('✅ Создан объект пользователя из initData:', user)
                 localStorage.setItem('telegram_user', JSON.stringify(user))
                 onAuth(user)
                 setIsChecking(false)
                 return true
+              } else {
+                console.error('❌ Недостаточно данных пользователя:', { id: user.id, first_name: user.first_name })
               }
+            } else {
+              console.warn('⚠️ Параметр user не найден в initData')
             }
           } catch (error) {
             console.error('❌ Ошибка при парсинге initData:', error)
+            console.error('❌ initData строка:', webApp.initData)
           }
+        } else {
+          console.warn('⚠️ webApp.initData отсутствует')
         }
+      } else {
+        console.log('⚠️ window.Telegram?.WebApp не найден')
       }
       return false
     }
@@ -113,14 +178,16 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
       return
     }
 
-    // Если скрипт еще не загружен, ждем его загрузки
+    // Если скрипт еще не загружен, ждем его загрузки (увеличиваем время ожидания)
     let attempts = 0
-    const maxAttempts = 10
+    const maxAttempts = 30 // Увеличено с 10 до 30 (3 секунды)
     const checkInterval = setInterval(() => {
       attempts++
+      console.log(`🔍 Попытка ${attempts}/${maxAttempts}...`)
       if (checkWebApp() || attempts >= maxAttempts) {
         clearInterval(checkInterval)
         if (attempts >= maxAttempts) {
+          console.warn('⚠️ Превышено максимальное количество попыток')
           // Проверяем сохраненные данные, если Web App не доступен
           const savedUser = localStorage.getItem('telegram_user')
           if (savedUser) {
@@ -213,6 +280,25 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
             <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem' }}>
               Авторизация должна произойти автоматически. Если этого не произошло, используйте кнопку выше.
             </p>
+            <details style={{ marginTop: '1rem', textAlign: 'left', fontSize: '0.8rem' }}>
+              <summary style={{ cursor: 'pointer', color: '#0c5460', fontWeight: 500 }}>
+                🔍 Отладочная информация
+              </summary>
+              <div style={{ marginTop: '0.5rem', padding: '0.5rem', background: '#fff', borderRadius: '4px', fontFamily: 'monospace' }}>
+                <div>initData: {window.Telegram?.WebApp?.initData ? '✅ Есть' : '❌ Нет'}</div>
+                <div>initDataUnsafe: {window.Telegram?.WebApp?.initDataUnsafe ? '✅ Есть' : '❌ Нет'}</div>
+                <div>initDataUnsafe.user: {window.Telegram?.WebApp?.initDataUnsafe?.user ? '✅ Есть' : '❌ Нет'}</div>
+                {window.Telegram?.WebApp?.initDataUnsafe?.user && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    ID: {window.Telegram.WebApp.initDataUnsafe.user.id}<br/>
+                    Имя: {window.Telegram.WebApp.initDataUnsafe.user.first_name}
+                  </div>
+                )}
+                <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#666' }}>
+                  Откройте консоль браузера (F12) для подробных логов
+                </div>
+              </div>
+            </details>
           </div>
         ) : (
           <div style={{ 
