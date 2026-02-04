@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "NEXT_DISABLE_TURBO=1 next dev",
+    "dev": "next dev --no-turbo",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
