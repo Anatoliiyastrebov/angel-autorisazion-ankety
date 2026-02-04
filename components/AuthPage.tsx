@@ -62,14 +62,40 @@ function AuthPageContent({ onAuth }: AuthPageProps) {
 
     setIsChecking(true)
 
+    // Приоритет 0: Сначала проверяем localStorage (для случаев возврата на сайт после авторизации)
+    const savedUser = localStorage.getItem('telegram_user')
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser)
+        if (user.id && user.first_name) {
+          console.log('✅ Найдены сохраненные данные пользователя в localStorage')
+          onAuth(user)
+          setIsChecking(false)
+          return
+        }
+      } catch (e) {
+        console.warn('⚠️ Ошибка при парсинге сохраненных данных:', e)
+        localStorage.removeItem('telegram_user')
+      }
+    }
+
     // Ждем загрузки Telegram Web App скрипта
     const checkWebApp = () => {
-      console.log('🔍 Проверка Telegram Web App...')
-      
       // Проверяем, если открыто из Telegram Web App
       if (window.Telegram?.WebApp) {
         const webApp = window.Telegram.WebApp
-        console.log('✅ Telegram WebApp объект найден:', {
+        
+        // Проверяем, есть ли реальные данные (не пустой объект)
+        const hasRealData = webApp.initData && webApp.initData.length > 0
+        const hasRealUser = webApp.initDataUnsafe?.user
+        
+        if (!hasRealData && !hasRealUser) {
+          // Web App объект есть, но данных нет - значит открыто в обычном браузере
+          console.log('ℹ️ Web App объект найден, но данных нет (открыто в обычном браузере)')
+          return false
+        }
+        
+        console.log('✅ Telegram WebApp объект найден с данными:', {
           hasInitData: !!webApp.initData,
           hasInitDataUnsafe: !!webApp.initDataUnsafe,
           initDataLength: webApp.initData?.length || 0,
@@ -93,17 +119,6 @@ function AuthPageContent({ onAuth }: AuthPageProps) {
         const webAppUser = webApp.initDataUnsafe?.user
         const initData = webApp.initDataUnsafe
 
-        console.log('🔍 Данные initDataUnsafe:', {
-          hasUser: !!webAppUser,
-          hasAuthDate: !!initData?.auth_date,
-          hasHash: !!initData?.hash,
-          user: webAppUser ? {
-            id: webAppUser.id,
-            first_name: webAppUser.first_name,
-            username: webAppUser.username
-          } : null
-        })
-
         // Приоритет 1: Данные из initDataUnsafe (самый надежный способ)
         if (webAppUser && initData?.auth_date && initData?.hash) {
           console.log('✅ Telegram Web App: данные пользователя найдены через initDataUnsafe', webAppUser)
@@ -118,36 +133,25 @@ function AuthPageContent({ onAuth }: AuthPageProps) {
             initData: webApp.initData,
           }
           
-          console.log('✅ Создан объект пользователя:', user)
-          
           // Сохраняем в localStorage
           localStorage.setItem('telegram_user', JSON.stringify(user))
           
           // Вызываем callback
-          console.log('✅ Вызываем onAuth callback')
           onAuth(user)
           setIsChecking(false)
           return true
         }
 
         // Приоритет 2: Парсим initData строку
-        if (webApp.initData) {
-          console.log('🔍 Парсим initData строку:', webApp.initData.substring(0, 100) + '...')
+        if (webApp.initData && webApp.initData.length > 0) {
           try {
             const params = new URLSearchParams(webApp.initData)
             const userParam = params.get('user')
             const authDate = params.get('auth_date')
             const hash = params.get('hash')
             
-            console.log('🔍 Параметры из initData:', {
-              hasUser: !!userParam,
-              hasAuthDate: !!authDate,
-              hasHash: !!hash
-            })
-            
             if (userParam) {
               const userData = JSON.parse(decodeURIComponent(userParam))
-              console.log('✅ Найдены данные пользователя в initData:', userData)
               
               const user: TelegramUser = {
                 id: userData.id,
@@ -161,26 +165,16 @@ function AuthPageContent({ onAuth }: AuthPageProps) {
               }
               
               if (user.id && user.first_name) {
-                console.log('✅ Создан объект пользователя из initData:', user)
                 localStorage.setItem('telegram_user', JSON.stringify(user))
                 onAuth(user)
                 setIsChecking(false)
                 return true
-              } else {
-                console.error('❌ Недостаточно данных пользователя:', { id: user.id, first_name: user.first_name })
               }
-            } else {
-              console.warn('⚠️ Параметр user не найден в initData')
             }
           } catch (error) {
             console.error('❌ Ошибка при парсинге initData:', error)
-            console.error('❌ initData строка:', webApp.initData)
           }
-        } else {
-          console.warn('⚠️ webApp.initData отсутствует')
         }
-      } else {
-        console.log('⚠️ window.Telegram?.WebApp не найден')
       }
       return false
     }
@@ -190,23 +184,21 @@ function AuthPageContent({ onAuth }: AuthPageProps) {
       return
     }
 
-    // Если скрипт еще не загружен, ждем его загрузки (увеличиваем время ожидания)
+    // Если скрипт еще не загружен, ждем его загрузки (но не долго, если данных нет)
     let attempts = 0
-    const maxAttempts = 30 // Увеличено с 10 до 30 (3 секунды)
+    const maxAttempts = 10 // Уменьшено до 10 попыток (1 секунда)
     const checkInterval = setInterval(() => {
       attempts++
-      console.log(`🔍 Попытка ${attempts}/${maxAttempts}...`)
       if (checkWebApp() || attempts >= maxAttempts) {
         clearInterval(checkInterval)
         if (attempts >= maxAttempts) {
-          console.warn('⚠️ Превышено максимальное количество попыток')
-          // Проверяем сохраненные данные, если Web App не доступен
+          // Проверяем сохраненные данные еще раз
           const savedUser = localStorage.getItem('telegram_user')
           if (savedUser) {
             try {
               const user = JSON.parse(savedUser)
               if (user.id && user.first_name) {
-                console.log('✅ Найдены сохраненные данные пользователя')
+                console.log('✅ Найдены сохраненные данные пользователя (после попыток)')
                 onAuth(user)
                 setIsChecking(false)
                 return
