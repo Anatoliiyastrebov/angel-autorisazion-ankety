@@ -60,10 +60,19 @@ export default function QuestionnaireForm({
 
   // Получаем имя бота из переменных окружения
   const [botName, setBotName] = useState<string>('')
+  const [envError, setEnvError] = useState<string | null>(null)
   
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setBotName(process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || '')
+      const botNameValue = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || ''
+      setBotName(botNameValue)
+      
+      // Проверяем, что переменные окружения настроены
+      if (!botNameValue || botNameValue.trim() === '') {
+        setEnvError('Переменная окружения NEXT_PUBLIC_TELEGRAM_BOT_NAME не настроена. Пожалуйста, настройте её в Vercel и пересоберите проект.')
+      } else {
+        setEnvError(null)
+      }
     }
   }, [])
 
@@ -316,6 +325,19 @@ export default function QuestionnaireForm({
         <div className="card">
           <h1>{title}</h1>
 
+          {envError && (
+            <div className="error-message" style={{ 
+              background: '#fff3cd', 
+              border: '1px solid #ffc107', 
+              color: '#856404',
+              padding: '1rem',
+              borderRadius: '4px',
+              marginBottom: '1rem'
+            }}>
+              <strong>⚠️ {envError}</strong>
+            </div>
+          )}
+
           {error && <div className="error-message">{error}</div>}
 
           {/* Вопросы анкеты - все на одной странице */}
@@ -446,7 +468,7 @@ export default function QuestionnaireForm({
                 <button
                   className="button"
                   onClick={handleSubmit}
-                  disabled={isSubmitting || questions.some(q => !answers[q.id] || answers[q.id].trim() === '')}
+                  disabled={isSubmitting || !!envError || questions.some(q => !answers[q.id] || answers[q.id].trim() === '')}
                   style={{ width: '100%', fontSize: '1.1rem', padding: '1rem' }}
                 >
                   {isSubmitting ? 'Отправка...' : 'Отправить анкету'}
