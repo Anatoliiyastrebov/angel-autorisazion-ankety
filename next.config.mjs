@@ -1,10 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Отключаем Turbopack из-за проблем с кириллицей в пути
-  experimental: {
-    turbo: false,
-  },
+  // Turbopack отключен через переменную окружения NEXT_DISABLE_TURBO=1 в скрипте dev
 }
 
 export default nextConfig
