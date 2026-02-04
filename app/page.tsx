@@ -39,25 +39,48 @@ function HomeContent() {
       if (authConfirmed === 'confirmed') {
         console.log('✅ Параметр auth=confirmed найден, загружаем данные...')
         
-        // Даем небольшую задержку для сохранения данных из Web App
+        // Даем задержку для сохранения данных из Web App
+        const checkUser = () => {
+          const savedUser = localStorage.getItem('telegram_user')
+          console.log('🔍 Проверка localStorage:', savedUser ? 'данные найдены' : 'данные не найдены')
+          
+          if (savedUser) {
+            try {
+              const user = JSON.parse(savedUser)
+              if (user.id && user.first_name) {
+                console.log('✅ Пользователь загружен:', user)
+                setTelegramUser(user)
+                setIsLoading(false)
+                // Очищаем параметр из URL
+                window.history.replaceState({}, '', window.location.pathname)
+                return true
+              }
+            } catch (e) {
+              console.error('❌ Ошибка при парсинге:', e)
+            }
+          }
+          return false
+        }
+        
+        // Проверяем несколько раз с задержками
         setTimeout(() => {
-          const userLoaded = loadUser()
-          if (!userLoaded) {
-            console.warn('⚠️ Данные пользователя не найдены после подтверждения')
-            // Пробуем еще раз через небольшую задержку
+          if (!checkUser()) {
             setTimeout(() => {
-              loadUser()
-              setIsLoading(false)
+              if (!checkUser()) {
+                setTimeout(() => {
+                  checkUser()
+                  setIsLoading(false)
+                }, 1000)
+              }
             }, 500)
           }
-          
-          // Очищаем параметр из URL
-          window.history.replaceState({}, '', window.location.pathname)
-        }, 100)
+        }, 200)
       } else {
         // Обычная загрузка без параметра
-        loadUser()
-        setIsLoading(false)
+        const userLoaded = loadUser()
+        if (!userLoaded) {
+          setIsLoading(false)
+        }
       }
     }
   }, [searchParams])
