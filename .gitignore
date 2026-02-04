@@ -14,6 +14,7 @@
 
 # old vite build
 /dist/
+/index.html
 
 # production
 /build
