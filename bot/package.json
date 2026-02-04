@@ -1,0 +1,24 @@
+{
+  "name": "telegram-auth-bot",
+  "version": "1.0.0",
+  "description": "Telegram бот для авторизации на сайте",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "auth"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7"
+  }
+}
+
