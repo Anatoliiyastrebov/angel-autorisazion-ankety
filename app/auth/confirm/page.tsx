@@ -64,12 +64,50 @@ function AuthConfirmContent() {
 
       if (webAppUser && initData?.auth_date && initData?.hash) {
         console.log('✅ Данные пользователя найдены в Web App')
+        
+        // Валидация данных пользователя
+        if (!webAppUser.id || !webAppUser.first_name) {
+          console.error('❌ ОШИБКА: Неполные данные пользователя из Web App')
+          console.error('❌ ID:', webAppUser.id, 'Имя:', webAppUser.first_name)
+          return
+        }
+        
+        // Проверка auth_date (данные не должны быть старше 24 часов)
+        const currentTime = Math.floor(Date.now() / 1000)
+        const authDate = initData.auth_date
+        if (currentTime - authDate > 86400) {
+          console.error('❌ ОШИБКА: Данные авторизации устарели (старше 24 часов)')
+          console.error('❌ Текущее время:', currentTime, 'Время авторизации:', authDate)
+          return
+        }
+        
+        // Проверка hash (базовая проверка наличия)
+        if (!initData.hash || initData.hash.length === 0) {
+          console.error('❌ ОШИБКА: Hash отсутствует или пустой')
+          return
+        }
+        
+        // Проверка initData строки
+        if (!webApp.initData || webApp.initData.length === 0) {
+          console.error('❌ ОШИБКА: initData строка отсутствует или пустая')
+          return
+        }
+        
+        console.log('✅ Валидация данных пройдена:', {
+          id: webAppUser.id,
+          first_name: webAppUser.first_name,
+          hasHash: !!initData.hash,
+          hasInitData: !!webApp.initData,
+          authDate: authDate,
+          age: currentTime - authDate
+        })
+        
         const user: TelegramUser = {
           id: webAppUser.id,
           first_name: webAppUser.first_name,
-          last_name: webAppUser.last_name,
-          username: webAppUser.username,
-          photo_url: webAppUser.photo_url,
+          last_name: webAppUser.last_name || undefined,
+          username: webAppUser.username || undefined,
+          photo_url: webAppUser.photo_url || undefined,
           auth_date: initData.auth_date,
           hash: initData.hash,
           initData: webApp.initData,
@@ -82,7 +120,16 @@ function AuthConfirmContent() {
         // Проверяем сохранение
         const saved = localStorage.getItem('telegram_user')
         if (saved) {
-          console.log('✅ Данные успешно сохранены в localStorage при обнаружении Web App')
+          try {
+            const parsed = JSON.parse(saved)
+            if (parsed.id === user.id && parsed.first_name === user.first_name) {
+              console.log('✅ Данные успешно сохранены и проверены в localStorage')
+            } else {
+              console.error('❌ ОШИБКА: Сохраненные данные не совпадают с исходными')
+            }
+          } catch (e) {
+            console.error('❌ ОШИБКА: Не удалось распарсить сохраненные данные:', e)
+          }
         } else {
           console.error('❌ ОШИБКА: Не удалось сохранить данные в localStorage')
         }
@@ -170,20 +217,39 @@ function AuthConfirmContent() {
         console.error('❌ Ошибка при проверке сохраненных данных:', e)
       }
 
-      // Получаем URL для возврата из localStorage
+      // Получаем URL для возврата и тип анкеты из localStorage
       const returnUrl = typeof window !== 'undefined' 
         ? localStorage.getItem('return_url') 
         : null
+      const savedQuestionnaireType = typeof window !== 'undefined'
+        ? localStorage.getItem('questionnaire_type')
+        : null
       
-      console.log('🔍 Проверка return_url в localStorage:', returnUrl)
-      console.log('🔍 Все данные в localStorage:', {
+      console.log('🔍 Проверка данных в localStorage:', {
         return_url: returnUrl,
+        questionnaire_type: savedQuestionnaireType,
         telegram_user: localStorage.getItem('telegram_user') ? 'есть' : 'нет'
       })
       
+      // Валидация сохраненного URL
+      let validReturnUrl = returnUrl
+      if (returnUrl) {
+        // Проверяем, что URL валидный (начинается с /)
+        if (!returnUrl.startsWith('/')) {
+          console.warn('⚠️ Некорректный return_url, используем главную страницу')
+          validReturnUrl = '/'
+        }
+        
+        // Проверяем, что это не страница авторизации
+        if (returnUrl.includes('/auth/')) {
+          console.warn('⚠️ return_url указывает на страницу авторизации, используем главную')
+          validReturnUrl = '/'
+        }
+      }
+      
       // Если есть сохраненный URL, возвращаемся на него, иначе на главную
       // Убираем параметр auth=confirmed из URL, если он там есть, и добавляем заново
-      let cleanReturnUrl = returnUrl || '/'
+      let cleanReturnUrl = validReturnUrl || '/'
       if (cleanReturnUrl.includes('auth=confirmed')) {
         cleanReturnUrl = cleanReturnUrl.replace(/[?&]auth=confirmed/g, '').replace(/^&/, '?')
       }
@@ -191,17 +257,24 @@ function AuthConfirmContent() {
       const redirectUrl = `${cleanReturnUrl}${cleanReturnUrl.includes('?') ? '&' : '?'}auth=confirmed`
       
       console.log('🔗 Исходный URL для возврата:', returnUrl || 'главная страница')
+      console.log('🔗 Валидированный URL:', validReturnUrl || 'главная страница')
       console.log('🔗 Очищенный URL:', cleanReturnUrl)
       console.log('🔗 Полный URL редиректа:', redirectUrl)
+      console.log('🔗 Тип анкеты для проверки:', savedQuestionnaireType)
       
-      // Очищаем return_url из localStorage ПОСЛЕ использования (чтобы не потерять данные)
-      // Но только если мы действительно используем его
-      if (returnUrl && typeof window !== 'undefined') {
+      // Очищаем сохраненные данные из localStorage ПОСЛЕ использования
+      if (typeof window !== 'undefined') {
         // Не удаляем сразу, дадим время на редирект
         setTimeout(() => {
-          localStorage.removeItem('return_url')
-          console.log('🗑️ return_url удален из localStorage')
-        }, 1000)
+          if (returnUrl) {
+            localStorage.removeItem('return_url')
+            console.log('🗑️ return_url удален из localStorage')
+          }
+          if (savedQuestionnaireType) {
+            localStorage.removeItem('questionnaire_type')
+            console.log('🗑️ questionnaire_type удален из localStorage')
+          }
+        }, 2000)
       }
       
       // Если открыто в Telegram Web App

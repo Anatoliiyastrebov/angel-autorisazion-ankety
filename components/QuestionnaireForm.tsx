@@ -181,6 +181,16 @@ function QuestionnaireFormContent({
   const loadUserData = () => {
     console.log('🔍 Загрузка данных пользователя из localStorage...')
     const savedUser = localStorage.getItem('telegram_user')
+    const savedQuestionnaireType = localStorage.getItem('questionnaire_type')
+    
+    // Проверяем, что тип анкеты совпадает
+    if (savedQuestionnaireType && savedQuestionnaireType !== questionnaireType) {
+      console.warn('⚠️ Тип анкеты не совпадает:', {
+        сохраненный: savedQuestionnaireType,
+        текущий: questionnaireType
+      })
+      // Можно показать предупреждение или перенаправить на правильную анкету
+    }
     
     if (savedUser) {
       try {
@@ -191,30 +201,47 @@ function QuestionnaireFormContent({
           last_name: user.last_name,
           username: user.username,
           hasId: !!user.id,
-          hasFirstName: !!user.first_name
+          hasFirstName: !!user.first_name,
+          hasHash: !!user.hash,
+          hasInitData: !!user.initData
         })
         
-        if (user.id && user.first_name) {
-          console.log('✅ Данные пользователя загружены из localStorage:', user)
-          setTelegramUser(user)
-          
-          // Автоматически заполняем имя и фамилию из Telegram
-          setAnswers(prev => {
-            const newAnswers = { ...prev }
-            if (user.first_name && !newAnswers.first_name) {
-              newAnswers.first_name = user.first_name
-              console.log('✅ Автозаполнение: имя =', user.first_name)
-            }
-            if (user.last_name && !newAnswers.last_name) {
-              newAnswers.last_name = user.last_name
-              console.log('✅ Автозаполнение: фамилия =', user.last_name)
-            }
-            return newAnswers
-          })
-        } else {
-          console.warn('⚠️ Данные пользователя неполные:', user)
-          console.warn('⚠️ id:', user.id, 'first_name:', user.first_name)
+        // Валидация данных пользователя
+        if (!user.id || !user.first_name) {
+          console.error('❌ ОШИБКА: Неполные данные пользователя')
+          console.error('❌ ID:', user.id, 'Имя:', user.first_name)
+          localStorage.removeItem('telegram_user')
+          return
         }
+        
+        // Проверка auth_date (данные не должны быть старше 24 часов)
+        if (user.auth_date) {
+          const currentTime = Math.floor(Date.now() / 1000)
+          const authDate = user.auth_date
+          if (currentTime - authDate > 86400) {
+            console.error('❌ ОШИБКА: Данные авторизации устарели (старше 24 часов)')
+            localStorage.removeItem('telegram_user')
+            return
+          }
+        }
+        
+        console.log('✅ Валидация данных пользователя пройдена')
+        console.log('✅ Данные пользователя загружены из localStorage:', user)
+        setTelegramUser(user)
+        
+        // Автоматически заполняем имя и фамилию из Telegram
+        setAnswers(prev => {
+          const newAnswers = { ...prev }
+          if (user.first_name && !newAnswers.first_name) {
+            newAnswers.first_name = user.first_name
+            console.log('✅ Автозаполнение: имя =', user.first_name)
+          }
+          if (user.last_name && !newAnswers.last_name) {
+            newAnswers.last_name = user.last_name
+            console.log('✅ Автозаполнение: фамилия =', user.last_name)
+          }
+          return newAnswers
+        })
       } catch (e) {
         console.error('❌ Ошибка при парсинге данных пользователя:', e)
         console.error('❌ Сырые данные:', savedUser)
@@ -429,7 +456,7 @@ function QuestionnaireFormContent({
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                 <button
                   onClick={() => {
-                    // Сохраняем текущий URL анкеты для возврата после авторизации
+                    // Сохраняем текущий URL анкеты и тип анкеты для возврата после авторизации
                     if (typeof window !== 'undefined') {
                       // Получаем текущий URL без параметра auth=confirmed (если он есть)
                       const currentPath = window.location.pathname
@@ -440,9 +467,16 @@ function QuestionnaireFormContent({
                       
                       const currentUrl = currentPath + (currentSearch || '')
                       
-                      // Сохраняем URL
+                      // Сохраняем URL анкеты
                       localStorage.setItem('return_url', currentUrl)
-                      console.log('💾 Сохранен URL для возврата:', currentUrl)
+                      
+                      // Сохраняем тип анкеты для проверки
+                      localStorage.setItem('questionnaire_type', questionnaireType)
+                      
+                      console.log('💾 Сохранены данные для возврата:', {
+                        url: currentUrl,
+                        questionnaireType: questionnaireType
+                      })
                     }
                     
                     // Открываем авторизацию через Web App напрямую (не закрывая текущую страницу)
