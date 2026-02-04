@@ -209,7 +209,7 @@ function AuthConfirmContent() {
         const webApp = window.Telegram.WebApp
         
         // Показываем уведомление об успехе
-        webApp.showAlert('✅ Авторизация успешна! Вы будете перенаправлены обратно в анкету.', () => {
+        webApp.showAlert('✅ Авторизация успешна! Возвращаемся обратно в анкету.', () => {
           // Дополнительная проверка сохранения данных перед редиректом
           const finalCheck = localStorage.getItem('telegram_user')
           if (!finalCheck) {
@@ -221,31 +221,25 @@ function AuthConfirmContent() {
             console.log('✅ Финальная проверка: данные в localStorage присутствуют')
           }
           
-          // Открываем сайт в браузере с параметром auth=confirmed
-          const siteUrl = `${window.location.origin}${redirectUrl}`
-          console.log('🔗 Открываем сайт:', siteUrl)
-          console.log('🔗 Данные для передачи:', {
-            return_url: returnUrl,
-            telegram_user_saved: !!localStorage.getItem('telegram_user')
-          })
-          
-          webApp.openLink(siteUrl, { try_instant_view: false })
-          
-          // НЕ удаляем return_url сразу - дадим время на редирект
-          // Удалим его через задержку
-          setTimeout(() => {
-            if (returnUrl) {
-              localStorage.removeItem('return_url')
-              console.log('🗑️ return_url удален из localStorage')
-            }
-          }, 2000)
+          // Если есть return_url, возвращаемся на него, иначе на главную
+          if (returnUrl) {
+            // Возвращаемся на страницу анкеты (она должна быть открыта)
+            const siteUrl = `${window.location.origin}${redirectUrl}`
+            console.log('🔗 Возвращаемся на страницу анкеты:', siteUrl)
+            webApp.openLink(siteUrl, { try_instant_view: false })
+          } else {
+            // Если нет return_url, возвращаемся на главную
+            const siteUrl = `${window.location.origin}/?auth=confirmed`
+            console.log('🔗 Возвращаемся на главную страницу:', siteUrl)
+            webApp.openLink(siteUrl, { try_instant_view: false })
+          }
           
           // Закрываем Web App через небольшую задержку
           setTimeout(() => {
             if (webApp.close) {
               webApp.close()
             }
-          }, 1500)
+          }, 1000)
         })
       } else {
         // Если не в Web App, просто перенаправляем

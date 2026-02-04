@@ -119,66 +119,64 @@ function QuestionnaireFormContent({
     const authConfirmed = searchParams.get('auth')
     if (authConfirmed === 'confirmed') {
       console.log('✅ Авторизация подтверждена, загружаем данные пользователя...')
-      console.log('🔍 Текущий URL:', window.location.href)
-      
-      // Даем задержку для сохранения данных из Web App и загружаем данные несколько раз
-      const loadWithRetry = (attempt = 1, maxAttempts = 5) => {
-        console.log(`🔄 Попытка ${attempt}/${maxAttempts} загрузки данных пользователя...`)
-        const savedUser = localStorage.getItem('telegram_user')
-        
-        if (savedUser) {
-          try {
-            const user = JSON.parse(savedUser)
-            if (user.id && user.first_name) {
-              console.log('✅ Данные пользователя найдены:', user)
-              setTelegramUser(user)
-              
-              // Автоматически заполняем данные
-              setAnswers(prev => {
-                const newAnswers = { ...prev }
-                if (user.first_name && !newAnswers.first_name) {
-                  newAnswers.first_name = user.first_name
-                  console.log('✅ Автозаполнение: имя =', user.first_name)
-                }
-                if (user.last_name && !newAnswers.last_name) {
-                  newAnswers.last_name = user.last_name
-                  console.log('✅ Автозаполнение: фамилия =', user.last_name)
-                }
-                return newAnswers
-              })
-              
-              // Очищаем параметр из URL
-              const newUrl = window.location.pathname
-              window.history.replaceState({}, '', newUrl)
-              console.log('✅ URL очищен, остаемся на странице анкеты:', newUrl)
-              return true
-            }
-          } catch (e) {
-            console.error('❌ Ошибка при парсинге данных:', e)
-          }
-        }
-        
-        if (attempt < maxAttempts) {
-          setTimeout(() => loadWithRetry(attempt + 1, maxAttempts), 300)
-        } else {
-          console.warn('⚠️ Не удалось загрузить данные пользователя после всех попыток')
-        }
-        return false
-      }
-      
-      // Начинаем загрузку с задержкой (увеличена для надежности)
-      setTimeout(() => {
-        console.log('🔄 Начинаем загрузку данных пользователя...')
-        console.log('🔍 Проверка localStorage:', {
-          telegram_user: localStorage.getItem('telegram_user') ? 'есть' : 'нет',
-          return_url: localStorage.getItem('return_url') || 'нет'
-        })
-        loadWithRetry()
-      }, 500) // Увеличена задержка до 500мс
+      loadUserData()
+      // Очищаем параметр из URL
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
     } else {
       loadUserData()
     }
   }, [searchParams])
+
+  // Периодическая проверка данных пользователя (если страница остается открытой)
+  useEffect(() => {
+    if (typeof window === 'undefined' || telegramUser) return
+
+    // Проверяем данные каждые 2 секунды, если пользователь еще не авторизован
+    const checkInterval = setInterval(() => {
+      const savedUser = localStorage.getItem('telegram_user')
+      if (savedUser && !telegramUser) {
+        console.log('🔄 Автоматическая проверка: данные пользователя найдены!')
+        try {
+          const user = JSON.parse(savedUser)
+          if (user.id && user.first_name) {
+            console.log('✅ Автоматическая загрузка данных пользователя:', user)
+            setTelegramUser(user)
+            
+            // Автоматически заполняем данные
+            setAnswers(prev => {
+              const newAnswers = { ...prev }
+              if (user.first_name && !newAnswers.first_name) {
+                newAnswers.first_name = user.first_name
+                console.log('✅ Автозаполнение: имя =', user.first_name)
+              }
+              if (user.last_name && !newAnswers.last_name) {
+                newAnswers.last_name = user.last_name
+                console.log('✅ Автозаполнение: фамилия =', user.last_name)
+              }
+              return newAnswers
+            })
+            
+            // Останавливаем проверку
+            clearInterval(checkInterval)
+          }
+        } catch (e) {
+          console.error('❌ Ошибка при автоматической загрузке данных:', e)
+        }
+      }
+    }, 2000) // Проверяем каждые 2 секунды
+
+    // Останавливаем проверку через 5 минут (чтобы не проверять бесконечно)
+    const timeout = setTimeout(() => {
+      clearInterval(checkInterval)
+      console.log('⏰ Автоматическая проверка данных остановлена (таймаут 5 минут)')
+    }, 5 * 60 * 1000)
+
+    return () => {
+      clearInterval(checkInterval)
+      clearTimeout(timeout)
+    }
+  }, [telegramUser])
 
   const loadUserData = () => {
     console.log('🔍 Загрузка данных пользователя из localStorage...')
@@ -428,7 +426,7 @@ function QuestionnaireFormContent({
             </p>
             
             {botName ? (
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                 <button
                   onClick={() => {
                     // Сохраняем текущий URL анкеты для возврата после авторизации
@@ -444,37 +442,24 @@ function QuestionnaireFormContent({
                       
                       // Сохраняем URL
                       localStorage.setItem('return_url', currentUrl)
-                      
-                      // Проверяем, что сохранилось
-                      const saved = localStorage.getItem('return_url')
                       console.log('💾 Сохранен URL для возврата:', currentUrl)
-                      console.log('💾 Проверка сохранения:', saved === currentUrl ? '✅ OK' : '❌ ОШИБКА')
-                      console.log('💾 Полный URL страницы:', window.location.href)
-                      console.log('💾 Все данные в localStorage:', {
-                        return_url: localStorage.getItem('return_url'),
-                        telegram_user: localStorage.getItem('telegram_user') ? 'есть' : 'нет'
-                      })
-                      
-                      if (saved !== currentUrl) {
-                        console.error('❌ ОШИБКА: URL не сохранился правильно!')
-                        alert('Ошибка сохранения URL. Попробуйте еще раз.')
-                        return
-                      }
                     }
                     
-                    // Открываем бота через Menu Button (если доступен) или через ссылку
+                    // Открываем авторизацию через Web App напрямую (не закрывая текущую страницу)
                     if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-                      // Если открыто в Web App, используем Menu Button
+                      // Если открыто в Web App, открываем страницу авторизации в том же окне
                       const webApp = window.Telegram.WebApp
-                      const botUrl = `https://t.me/${botName}`
-                      console.log('🔗 Открываем бота через Web App:', botUrl)
-                      webApp.openTelegramLink(botUrl)
+                      const authUrl = `${window.location.origin}/auth/confirm`
+                      console.log('🔗 Открываем авторизацию через Web App:', authUrl)
+                      webApp.openLink(authUrl, { try_instant_view: false })
                     } else {
-                      // Иначе открываем в новой вкладке
+                      // Если не Web App, открываем бота в новой вкладке (текущая остается открытой)
                       const botUrl = `https://t.me/${botName}`
-                      console.log('🔗 Открываем бота в новой вкладке:', botUrl)
-                      window.open(botUrl, '_blank')
-                      alert('Откройте бота и нажмите кнопку "Авторизоваться" внизу экрана, затем вернитесь на эту страницу.')
+                      console.log('🔗 Открываем бота в новой вкладке (текущая остается открытой):', botUrl)
+                      window.open(botUrl, '_blank', 'noopener,noreferrer')
+                      
+                      // Показываем сообщение и начинаем проверку данных
+                      alert('Бот откроется в новой вкладке. После авторизации вернитесь на эту страницу - данные загрузятся автоматически.')
                     }
                   }}
                   style={{
