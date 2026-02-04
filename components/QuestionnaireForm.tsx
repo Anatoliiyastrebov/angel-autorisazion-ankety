@@ -60,157 +60,61 @@ export default function QuestionnaireForm({
 
   // Получаем имя бота из переменных окружения
   const [botName, setBotName] = useState<string>('')
-  const [envError, setEnvError] = useState<string | null>(null)
   
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const botNameValue = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || ''
-      setBotName(botNameValue)
-      
-      // Проверяем, что переменные окружения настроены
-      if (!botNameValue || botNameValue.trim() === '') {
-        setEnvError('Переменная окружения NEXT_PUBLIC_TELEGRAM_BOT_NAME не настроена. Пожалуйста, настройте её в Vercel и пересоберите проект.')
-      } else {
-        setEnvError(null)
-      }
+      setBotName(process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || '')
     }
   }, [])
 
-  // Проверяем данные из Telegram Web App при загрузке (как было раньше)
+  // Опционально: проверяем данные из Telegram Web App при загрузке (для автозаполнения)
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || telegramUser) return
 
     let isMounted = true
     let webAppInitialized = false
 
-    // Проверяем Telegram Web App
     const checkTelegramWebApp = () => {
-      if (!isMounted) return
+      if (!isMounted || telegramUser) return
       
-      if (!window.Telegram?.WebApp) {
-        console.log('ℹ️ Telegram Web App не обнаружен')
-        return
-      }
+      if (!window.Telegram?.WebApp) return
 
       const webApp = window.Telegram.WebApp
       
-      // Вызываем ready и expand только один раз
       if (!webAppInitialized) {
         try {
           webApp.ready()
           webApp.expand()
           webAppInitialized = true
         } catch (e) {
-          // Игнорируем ошибки, если уже вызвано
+          // Игнорируем ошибки
         }
       }
 
-      console.log('🔍 Проверка данных Telegram Web App:', {
-        hasWebApp: !!window.Telegram?.WebApp,
-        hasInitDataUnsafe: !!webApp.initDataUnsafe,
-        hasUser: !!webApp.initDataUnsafe?.user,
-        initData: webApp.initData ? 'present' : 'missing',
-      })
-
-      // Проверяем, если открыто напрямую из Telegram Web App
-      if (webApp.initDataUnsafe?.user && !telegramUser && isMounted) {
+      // Если есть данные пользователя, автозаполняем форму (но не авторизуем автоматически)
+      if (webApp.initDataUnsafe?.user && isMounted && !telegramUser) {
         const webAppUser = webApp.initDataUnsafe.user
         const initData = webApp.initDataUnsafe
 
-        console.log('📋 Данные пользователя из Web App:', {
-          user: webAppUser,
-          auth_date: initData?.auth_date,
-          hash: initData?.hash ? 'present' : 'missing',
-        })
-
-        if (webAppUser && initData?.auth_date && initData?.hash && isMounted) {
-          console.log('✅ Telegram Web App: загружаю данные пользователя')
-          const user: TelegramUser = {
-            id: webAppUser.id,
-            first_name: webAppUser.first_name,
-            last_name: webAppUser.last_name,
-            username: webAppUser.username,
-            photo_url: webAppUser.photo_url,
-            auth_date: initData.auth_date,
-            hash: initData.hash,
-            initData: webApp.initData,
-          }
-
-          if (isMounted) {
-            setTelegramUser(user)
-            // Автоматически заполняем имя и фамилию из Telegram
-            setAnswers(prev => {
-              const newAnswers = { ...prev }
-              if (user.first_name && !newAnswers.first_name) {
-                newAnswers.first_name = user.first_name
-              }
-              if (user.last_name && !newAnswers.last_name) {
-                newAnswers.last_name = user.last_name
-              }
-              return newAnswers
-            })
-          }
-          return
-        } else {
-          console.warn('⚠️ Telegram Web App обнаружен, но данные пользователя неполные:', {
-            hasUser: !!webAppUser,
-            hasAuthDate: !!initData?.auth_date,
-            hasHash: !!initData?.hash,
-          })
-        }
-      } else if (window.Telegram?.WebApp && !webApp.initDataUnsafe?.user) {
-        console.log('ℹ️ Telegram Web App detected but user data not available')
-        
-        // Попробуем получить данные из initData строки напрямую
-        if (webApp.initData && isMounted) {
-          console.log('🔍 Пытаюсь парсить initData строку:', webApp.initData.substring(0, 100))
-          try {
-            // Парсим initData строку (формат: key=value&key2=value2)
-            const params = new URLSearchParams(webApp.initData)
-            const userParam = params.get('user')
-            if (userParam && isMounted) {
-              const userData = JSON.parse(decodeURIComponent(userParam))
-              console.log('✅ Найдены данные пользователя в initData:', userData)
-              
-              const user: TelegramUser = {
-                id: userData.id,
-                first_name: userData.first_name,
-                last_name: userData.last_name,
-                username: userData.username,
-                photo_url: userData.photo_url,
-                auth_date: parseInt(params.get('auth_date') || '0'),
-                hash: params.get('hash') || '',
-                initData: webApp.initData,
-              }
-              
-              if (user.id && user.first_name && isMounted) {
-                setTelegramUser(user)
-                setAnswers(prev => {
-                  const newAnswers = { ...prev }
-                  if (user.first_name && !newAnswers.first_name) {
-                    newAnswers.first_name = user.first_name
-                  }
-                  if (user.last_name && !newAnswers.last_name) {
-                    newAnswers.last_name = user.last_name
-                  }
-                  return newAnswers
-                })
-                return
-              }
+        if (webAppUser && initData?.auth_date && initData?.hash) {
+          // Только автозаполняем имя и фамилию, но не устанавливаем telegramUser
+          setAnswers(prev => {
+            const newAnswers = { ...prev }
+            if (webAppUser.first_name && !newAnswers.first_name) {
+              newAnswers.first_name = webAppUser.first_name
             }
-          } catch (error) {
-            console.error('❌ Ошибка при парсинге initData:', error)
-          }
+            if (webAppUser.last_name && !newAnswers.last_name) {
+              newAnswers.last_name = webAppUser.last_name
+            }
+            return newAnswers
+          })
         }
       }
     }
 
-    // Проверяем сразу
     checkTelegramWebApp()
-
-    // Также проверяем после небольшой задержки, на случай если Web App еще загружается
     const timeoutId = setTimeout(() => {
-      if (isMounted) {
+      if (isMounted && !telegramUser) {
         checkTelegramWebApp()
       }
     }, 500)
@@ -221,13 +125,13 @@ export default function QuestionnaireForm({
     }
   }, [telegramUser])
 
-  // Обработчик успешной авторизации через Telegram Login Widget (как fallback)
+  // Обработчик успешной авторизации через Telegram
   const handleTelegramAuth = (user: TelegramUser) => {
-    console.log('✅ Telegram Login Widget авторизация успешна:', user)
+    console.log('✅ Telegram авторизация успешна:', user)
     setTelegramUser(user)
     setError(null)
     
-    // Автоматически заполняем имя и фамилию из Telegram
+    // Автоматически заполняем имя и фамилию из Telegram, если они пустые
     setAnswers(prev => {
       const newAnswers = { ...prev }
       if (user.first_name && !newAnswers.first_name) {
@@ -238,6 +142,34 @@ export default function QuestionnaireForm({
       }
       return newAnswers
     })
+  }
+
+  // Обработчик авторизации через Telegram Web App (если пользователь нажимает кнопку)
+  const handleWebAppAuth = () => {
+    if (typeof window === 'undefined' || !window.Telegram?.WebApp) {
+      setError('Telegram Web App не обнаружен. Используйте кнопку авторизации ниже.')
+      return
+    }
+
+    const webApp = window.Telegram.WebApp
+    const webAppUser = webApp.initDataUnsafe?.user
+    const initData = webApp.initDataUnsafe
+
+    if (webAppUser && initData?.auth_date && initData?.hash) {
+      const user: TelegramUser = {
+        id: webAppUser.id,
+        first_name: webAppUser.first_name,
+        last_name: webAppUser.last_name,
+        username: webAppUser.username,
+        photo_url: webAppUser.photo_url,
+        auth_date: initData.auth_date,
+        hash: initData.hash,
+        initData: webApp.initData,
+      }
+      handleTelegramAuth(user)
+    } else {
+      setError('Данные пользователя не найдены. Откройте сайт через Telegram бота или используйте кнопку авторизации ниже.')
+    }
   }
 
 
@@ -325,19 +257,6 @@ export default function QuestionnaireForm({
         <div className="card">
           <h1>{title}</h1>
 
-          {envError && (
-            <div className="error-message" style={{ 
-              background: '#fff3cd', 
-              border: '1px solid #ffc107', 
-              color: '#856404',
-              padding: '1rem',
-              borderRadius: '4px',
-              marginBottom: '1rem'
-            }}>
-              <strong>⚠️ {envError}</strong>
-            </div>
-          )}
-
           {error && <div className="error-message">{error}</div>}
 
           {/* Вопросы анкеты - все на одной странице */}
@@ -415,47 +334,53 @@ export default function QuestionnaireForm({
             </div>
           )}
 
-          {/* Блок авторизации через Telegram */}
+          {/* Блок авторизации через Telegram - показывается после заполнения формы */}
           {!telegramUser && (
-            <div className="form-group" style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '1px solid #e0e0e0' }}>
+            <div className="form-group" style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '2px solid #e0e0e0' }}>
               <h2 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>Авторизация через Telegram</h2>
               
-              {/* Если открыто из Telegram Web App, показываем сообщение */}
+              <p style={{ marginBottom: '1.5rem', fontSize: '1rem', color: '#666', textAlign: 'center' }}>
+                Для отправки анкеты необходимо авторизоваться через Telegram
+              </p>
+              
+              {/* Если открыто из Telegram Web App, показываем кнопку для подтверждения */}
               {typeof window !== 'undefined' && window.Telegram?.WebApp ? (
-                <div style={{ 
-                  padding: '1.5rem', 
-                  background: '#fff3cd', 
-                  borderRadius: '8px',
-                  border: '1px solid #ffc107',
-                  textAlign: 'center'
-                }}>
-                  <p style={{ marginBottom: '0.5rem', fontWeight: 500, color: '#856404', fontSize: '1rem' }}>
-                    ⚠️ Данные пользователя не загружены
-                  </p>
-                  <p style={{ fontSize: '0.9rem', color: '#856404', marginBottom: '1.5rem' }}>
-                    Для автоматической авторизации откройте этот сайт из Telegram через бота или меню-кнопку.
-                  </p>
-                  <p style={{ fontSize: '0.85rem', color: '#856404' }}>
-                    Или используйте кнопку ниже для авторизации через Telegram Login Widget.
+                <div style={{ textAlign: 'center' }}>
+                  <button
+                    className="button"
+                    onClick={handleWebAppAuth}
+                    style={{ 
+                      width: '100%', 
+                      fontSize: '1.1rem', 
+                      padding: '1rem',
+                      background: '#0088cc',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✅ Подтвердить авторизацию через Telegram
+                  </button>
+                  <p style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#666' }}>
+                    Или используйте кнопку ниже для авторизации через Telegram Login Widget
                   </p>
                 </div>
-              ) : (
-                <p style={{ marginBottom: '1.5rem', fontSize: '0.95rem', color: '#666', textAlign: 'center' }}>
-                  Для отправки анкеты необходимо авторизоваться через Telegram. Нажмите кнопку ниже.
-                </p>
-              )}
+              ) : null}
               
-              {/* Telegram Login Widget как fallback */}
+              {/* Telegram Login Widget */}
               {botName ? (
-                <TelegramLogin
-                  botName={botName}
-                  onAuth={handleTelegramAuth}
-                  buttonSize="large"
-                  requestAccess={false}
-                />
+                <div style={{ marginTop: typeof window !== 'undefined' && window.Telegram?.WebApp ? '1.5rem' : '0' }}>
+                  <TelegramLogin
+                    botName={botName}
+                    onAuth={handleTelegramAuth}
+                    buttonSize="large"
+                    requestAccess={false}
+                  />
+                </div>
               ) : (
                 <div style={{ padding: '1rem', background: '#fff3cd', borderRadius: '8px', color: '#856404', textAlign: 'center' }}>
-                  ⚠️ Ошибка: имя бота не настроено. Проверьте переменную окружения NEXT_PUBLIC_TELEGRAM_BOT_NAME
+                  ⚠️ Имя бота не настроено. Проверьте переменную окружения NEXT_PUBLIC_TELEGRAM_BOT_NAME
                 </div>
               )}
             </div>
@@ -468,7 +393,7 @@ export default function QuestionnaireForm({
                 <button
                   className="button"
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !!envError || questions.some(q => !answers[q.id] || answers[q.id].trim() === '')}
+                  disabled={isSubmitting || questions.some(q => !answers[q.id] || answers[q.id].trim() === '')}
                   style={{ width: '100%', fontSize: '1.1rem', padding: '1rem' }}
                 >
                   {isSubmitting ? 'Отправка...' : 'Отправить анкету'}
