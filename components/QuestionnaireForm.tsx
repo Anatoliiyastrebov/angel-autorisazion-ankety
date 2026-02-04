@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { TelegramUser } from './TelegramLogin'
 
 interface QuestionnaireFormProps {
@@ -54,24 +54,82 @@ const questionnaireQuestions: Record<string, Array<{ id: string; label: string; 
   ],
 }
 
-export default function QuestionnaireForm({
+function QuestionnaireFormContent({
   title,
   questionnaireType,
 }: QuestionnaireFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const questions = questionnaireQuestions[questionnaireType] || []
   
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [botName, setBotName] = useState<string>('')
+
+  // Загружаем имя бота
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setBotName(process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || '')
+    }
+  }, [])
 
   // Загружаем данные пользователя из localStorage при загрузке
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // Получаем данные из localStorage
+    // Сначала проверяем Web App (если открыто через Menu Button)
+    if (window.Telegram?.WebApp) {
+      const webApp = window.Telegram.WebApp
+      const webAppUser = webApp.initDataUnsafe?.user
+      const initData = webApp.initDataUnsafe
+
+      if (webAppUser && initData?.auth_date && initData?.hash) {
+        const user: TelegramUser = {
+          id: webAppUser.id,
+          first_name: webAppUser.first_name,
+          last_name: webAppUser.last_name,
+          username: webAppUser.username,
+          photo_url: webAppUser.photo_url,
+          auth_date: initData.auth_date,
+          hash: initData.hash,
+          initData: webApp.initData,
+        }
+        
+        setTelegramUser(user)
+        localStorage.setItem('telegram_user', JSON.stringify(user))
+        
+        // Автоматически заполняем данные
+        setAnswers(prev => {
+          const newAnswers = { ...prev }
+          if (user.first_name && !newAnswers.first_name) {
+            newAnswers.first_name = user.first_name
+          }
+          if (user.last_name && !newAnswers.last_name) {
+            newAnswers.last_name = user.last_name
+          }
+          return newAnswers
+        })
+        return
+      }
+    }
+
+    // Проверяем параметр авторизации из URL (возврат после авторизации через бота)
+    const authConfirmed = searchParams.get('auth')
+    if (authConfirmed === 'confirmed') {
+      // Даем задержку для сохранения данных из Web App
+      setTimeout(() => {
+        loadUserData()
+        // Очищаем параметр из URL
+        window.history.replaceState({}, '', window.location.pathname)
+      }, 200)
+    } else {
+      loadUserData()
+    }
+  }, [searchParams])
+
+  const loadUserData = () => {
     const savedUser = localStorage.getItem('telegram_user')
     if (savedUser) {
       try {
@@ -90,70 +148,32 @@ export default function QuestionnaireForm({
             }
             return newAnswers
           })
-        } else {
-          // Если данные невалидны, перенаправляем на главную
-          router.push('/')
         }
       } catch (e) {
+        console.error('Ошибка при загрузке данных пользователя:', e)
         localStorage.removeItem('telegram_user')
-        router.push('/')
-      }
-    } else {
-      // Если пользователь не авторизован, перенаправляем на главную
-      router.push('/')
-    }
-
-    setIsLoading(false)
-  }, [router])
-
-  // Также проверяем Telegram Web App для обновления данных
-  useEffect(() => {
-    if (typeof window === 'undefined' || !telegramUser) return
-
-    if (window.Telegram?.WebApp) {
-      const webApp = window.Telegram.WebApp
-      
-      try {
-        webApp.ready()
-        webApp.expand()
-      } catch (e) {
-        // Игнорируем ошибки
-      }
-
-      // Обновляем данные из Web App, если они есть
-      const webAppUser = webApp.initDataUnsafe?.user
-      const initData = webApp.initDataUnsafe
-
-      if (webAppUser && initData?.auth_date && initData?.hash) {
-        const user: TelegramUser = {
-          id: webAppUser.id,
-          first_name: webAppUser.first_name,
-          last_name: webAppUser.last_name,
-          username: webAppUser.username,
-          photo_url: webAppUser.photo_url,
-          auth_date: initData.auth_date,
-          hash: initData.hash,
-          initData: webApp.initData,
-        }
-        
-        // Обновляем данные
-        setTelegramUser(user)
-        localStorage.setItem('telegram_user', JSON.stringify(user))
-        
-        // Обновляем автозаполнение
-        setAnswers(prev => {
-          const newAnswers = { ...prev }
-          if (user.first_name && !newAnswers.first_name) {
-            newAnswers.first_name = user.first_name
-          }
-          if (user.last_name && !newAnswers.last_name) {
-            newAnswers.last_name = user.last_name
-          }
-          return newAnswers
-        })
       }
     }
-  }, [telegramUser])
+  }
+
+  // Обработчик авторизации через Telegram
+  const handleTelegramAuth = (user: TelegramUser) => {
+    console.log('✅ Telegram авторизация успешна:', user)
+    setTelegramUser(user)
+    setError(null)
+    
+    // Автоматически заполняем данные из Telegram
+    setAnswers(prev => {
+      const newAnswers = { ...prev }
+      if (user.first_name && !newAnswers.first_name) {
+        newAnswers.first_name = user.first_name
+      }
+      if (user.last_name && !newAnswers.last_name) {
+        newAnswers.last_name = user.last_name
+      }
+      return newAnswers
+    })
+  }
 
   const handleInputChange = (questionId: string, value: string) => {
     setAnswers((prev) => ({
@@ -231,49 +251,47 @@ export default function QuestionnaireForm({
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="container">
-        <div className="card">
-          <h1>{title}</h1>
-          <p style={{ color: '#666', marginTop: '1rem', textAlign: 'center' }}>
-            Загрузка...
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!telegramUser) {
-    return null // Будет перенаправление на главную
-  }
-
   return (
     <div className="container">
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h1>{title}</h1>
-          <div style={{ 
-            padding: '0.5rem 1rem', 
-            background: '#d4edda', 
-            borderRadius: '8px',
-            border: '1px solid #c3e6cb',
-            fontSize: '0.9rem',
-            color: '#155724'
-          }}>
-            ✅ {telegramUser.username ? `@${telegramUser.username}` : telegramUser.first_name}
-          </div>
-        </div>
+        <h1 style={{ marginBottom: '2rem' }}>{title}</h1>
 
         {error && <div className="error-message">{error}</div>}
+
+        {/* Статус авторизации */}
+        {telegramUser && (
+          <div style={{ 
+            marginBottom: '2rem', 
+            padding: '1rem', 
+            background: '#d4edda', 
+            borderRadius: '8px',
+            border: '1px solid #c3e6cb'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1.2rem' }}>✅</span>
+              <strong style={{ color: '#155724', fontSize: '1rem' }}>Telegram подтверждён:</strong>
+            </div>
+            {telegramUser.username ? (
+              <span style={{ color: '#155724', fontSize: '1rem' }}>
+                @{telegramUser.username}
+              </span>
+            ) : (
+              <span style={{ color: '#155724', fontSize: '1rem' }}>
+                {telegramUser.first_name} {telegramUser.last_name || ''}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Вопросы анкеты */}
         {questions.length > 0 ? (
           <div style={{ marginTop: '2rem' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>Заполните анкету</h2>
-            <p style={{ marginBottom: '1.5rem', fontSize: '0.95rem', color: '#666' }}>
-              Данные из Telegram автоматически заполнены. Проверьте и дополните информацию.
-            </p>
+            {telegramUser && (
+              <p style={{ marginBottom: '1.5rem', fontSize: '0.95rem', color: '#666' }}>
+                Данные из Telegram автоматически заполнены. Проверьте и дополните информацию.
+              </p>
+            )}
             {questions.map((question) => (
               <div key={question.id} className="form-group" style={{ marginBottom: '1.5rem' }}>
                 <label htmlFor={question.id}>
@@ -320,14 +338,83 @@ export default function QuestionnaireForm({
           </div>
         )}
 
-        {/* Кнопка отправки */}
-        {questions.length > 0 && (
+        {/* Блок авторизации через Telegram (в конце формы) */}
+        {!telegramUser && (
+          <div style={{ 
+            marginTop: '2rem', 
+            padding: '2rem', 
+            background: '#e7f3ff', 
+            borderRadius: '8px',
+            border: '2px solid #0088cc'
+          }}>
+            <h3 style={{ marginBottom: '1rem', textAlign: 'center', color: '#0088cc' }}>
+              🔐 Авторизация через Telegram
+            </h3>
+            <p style={{ marginBottom: '1.5rem', fontSize: '0.95rem', color: '#666', textAlign: 'center' }}>
+              Для отправки анкеты необходимо авторизоваться через Telegram. 
+              После авторизации данные из Telegram автоматически заполнятся в анкете.
+            </p>
+            
+            {botName ? (
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <button
+                  onClick={() => {
+                    // Открываем бота через Menu Button (если доступен) или через ссылку
+                    if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+                      // Если открыто в Web App, используем Menu Button
+                      const webApp = window.Telegram.WebApp
+                      webApp.openTelegramLink(`https://t.me/${botName}`)
+                    } else {
+                      // Иначе открываем в новой вкладке
+                      const botUrl = `https://t.me/${botName}`
+                      window.open(botUrl, '_blank')
+                      alert('Откройте бота и нажмите кнопку "Авторизоваться" внизу экрана, затем вернитесь на эту страницу.')
+                    }
+                  }}
+                  style={{
+                    padding: '1rem 2rem',
+                    fontSize: '1.1rem',
+                    fontWeight: 500,
+                    background: '#0088cc',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span>🤖</span>
+                  <span>Авторизоваться через Telegram</span>
+                </button>
+              </div>
+            ) : (
+              <div style={{ padding: '1rem', background: '#fff3cd', borderRadius: '8px', color: '#856404', textAlign: 'center' }}>
+                ⚠️ Имя бота не настроено. Проверьте переменную окружения NEXT_PUBLIC_TELEGRAM_BOT_NAME
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Кнопка отправки (только если авторизован) */}
+        {questions.length > 0 && telegramUser && (
           <div style={{ marginTop: '2rem' }}>
             <button
               className="button"
               onClick={handleSubmit}
               disabled={isSubmitting || questions.some(q => !answers[q.id] || answers[q.id].trim() === '')}
-              style={{ width: '100%', fontSize: '1.1rem', padding: '1rem' }}
+              style={{ 
+                width: '100%', 
+                fontSize: '1.1rem', 
+                padding: '1rem',
+                background: isSubmitting || questions.some(q => !answers[q.id] || answers[q.id].trim() === '') 
+                  ? '#ccc' 
+                  : '#28a745',
+                cursor: isSubmitting || questions.some(q => !answers[q.id] || answers[q.id].trim() === '') 
+                  ? 'not-allowed' 
+                  : 'pointer'
+              }}
             >
               {isSubmitting ? 'Отправка...' : 'Отправить анкету'}
             </button>
@@ -336,7 +423,39 @@ export default function QuestionnaireForm({
             </p>
           </div>
         )}
+
+        {/* Сообщение, если не авторизован */}
+        {questions.length > 0 && !telegramUser && (
+          <div style={{ 
+            marginTop: '2rem', 
+            padding: '1rem', 
+            background: '#fff3cd', 
+            borderRadius: '8px',
+            textAlign: 'center'
+          }}>
+            <p style={{ color: '#856404', margin: 0, fontWeight: 500 }}>
+              ⚠️ Для отправки анкеты необходимо авторизоваться через Telegram
+            </p>
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+export default function QuestionnaireForm(props: QuestionnaireFormProps) {
+  return (
+    <Suspense fallback={
+      <div className="container">
+        <div className="card">
+          <h1>{props.title}</h1>
+          <p style={{ color: '#666', marginTop: '1rem', textAlign: 'center' }}>
+            Загрузка...
+          </p>
+        </div>
+      </div>
+    }>
+      <QuestionnaireFormContent {...props} />
+    </Suspense>
   )
 }
