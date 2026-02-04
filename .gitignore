@@ -12,6 +12,9 @@
 /.next/
 /out/
 
+# old vite build
+/dist/
+
 # production
 /build
 
