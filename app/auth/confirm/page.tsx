@@ -20,16 +20,23 @@ function AuthConfirmContent() {
       webApp.ready()
       webApp.expand()
 
-      // Получаем параметры из URL
-      const sessionId = searchParams.get('session')
-      const token = searchParams.get('token')
-      const userId = searchParams.get('user_id')
-
-      // Приоритет 1: Данные из Web App (если доступны)
+      // Приоритет 1: Данные из Web App (основной способ при открытии через Menu Button)
       const webAppUser = webApp.initDataUnsafe?.user
       const initData = webApp.initDataUnsafe
 
+      console.log('🔍 Проверка данных Web App:', {
+        hasWebApp: !!webApp,
+        hasUser: !!webAppUser,
+        hasInitData: !!initData,
+        user: webAppUser ? {
+          id: webAppUser.id,
+          first_name: webAppUser.first_name,
+          username: webAppUser.username
+        } : null
+      })
+
       if (webAppUser && initData?.auth_date && initData?.hash) {
+        console.log('✅ Данные пользователя найдены в Web App')
         const user: TelegramUser = {
           id: webAppUser.id,
           first_name: webAppUser.first_name,
@@ -44,13 +51,20 @@ function AuthConfirmContent() {
         setUserData(user)
         setIsAuthorized(true)
       } 
-      // Приоритет 2: Данные из параметров URL (от бота)
-      else if (token && userId) {
-        // Получаем данные пользователя через API
-        fetchUserData(token, userId)
-      } else {
-        console.warn('⚠️ Нет данных для авторизации')
+      // Приоритет 2: Данные из параметров URL (для обратной совместимости)
+      else {
+        const token = searchParams.get('token')
+        const userId = searchParams.get('user_id')
+        
+        if (token && userId) {
+          console.log('📡 Получение данных пользователя через API')
+          fetchUserData(token, userId)
+        } else {
+          console.warn('⚠️ Нет данных для авторизации. Убедитесь, что открыто через Menu Button бота.')
+        }
       }
+    } else {
+      console.warn('⚠️ Web App не обнаружен. Убедитесь, что открыто через Telegram бота.')
     }
   }, [searchParams])
 
