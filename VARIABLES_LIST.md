@@ -20,25 +20,12 @@
 
 ---
 
-## 🟢 Vite переменные (старая часть проекта)
-
-Эти переменные используются в старых компонентах проекта (`src/`), которые могут быть неактивны.
-
-| Переменная | Описание | Обязательная | Где используется |
-|------------|----------|--------------|------------------|
-| `VITE_TELEGRAM_BOT_TOKEN` | Токен бота для старой части проекта | ⚠️ Опционально | `src/_pages_old/Anketa.tsx`, `src/lib/form-utils.ts`, `api/auth/send-otp.ts` |
-| `VITE_TELEGRAM_CHAT_ID` | Chat ID для старой части проекта | ⚠️ Опционально | `src/_pages_old/Anketa.tsx`, `src/lib/form-utils.ts` |
-| `VITE_API_BASE_URL` | Базовый URL API (опционально) | ⚠️ Опционально | `src/lib/api-client.ts` | `/api` |
-
----
-
 ## 🟡 Supabase переменные (для хранения данных)
 
 | Переменная | Описание | Обязательная | Где используется |
 |------------|----------|--------------|------------------|
 | `SUPABASE_URL` | URL проекта Supabase | ⚠️ Опционально | `lib/supabase-server.ts`, `api/questionnaires/save.ts`, `api/questionnaires/get.ts`, `api/questionnaires/delete.ts`, `api/auth/send-otp.ts`, `api/auth/verify-otp.ts`, `api/gdpr/create-request.ts`, `supabase/functions/delete_old_profiles/index.ts` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service Role Key из Supabase | ⚠️ Опционально | Те же файлы, что и `SUPABASE_URL` |
-| `SUPABASE_ANON_KEY` | Anon Key из Supabase (для клиентской части) | ⚠️ Опционально | `supabase/config.example.ts` |
 
 ---
 
@@ -86,9 +73,6 @@ SUPABASE_URL=https://your-project.supabase.co
 # ⚠️ ВАЖНО: Никогда не публикуйте этот ключ!
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
-# Anon Key из Supabase (опционально, для клиентской части)
-SUPABASE_ANON_KEY=your_anon_key_here
-
 # ============================================
 # ENCRYPTION (опционально)
 # ============================================
@@ -96,19 +80,6 @@ SUPABASE_ANON_KEY=your_anon_key_here
 # Ключ шифрования (32 байта hex, 64 символа)
 # Сгенерировать: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ENCRYPTION_KEY=your_32_byte_hex_key_here
-
-# ============================================
-# VITE CONFIGURATION (старая часть проекта)
-# ============================================
-
-# Токен бота для старой части (если используется)
-VITE_TELEGRAM_BOT_TOKEN=your_bot_token_here
-
-# Chat ID для старой части (если используется)
-VITE_TELEGRAM_CHAT_ID=your_chat_id_here
-
-# Базовый URL API (опционально)
-VITE_API_BASE_URL=/api
 ```
 
 ---
@@ -126,11 +97,7 @@ VITE_API_BASE_URL=/api
 - `TELEGRAM_ADMIN_CHAT_ID` - для уведомлений администратору
 - `SUPABASE_URL` - если используется Supabase
 - `SUPABASE_SERVICE_ROLE_KEY` - если используется Supabase
-- `SUPABASE_ANON_KEY` - если используется Supabase на клиенте
 - `ENCRYPTION_KEY` - если используется шифрование
-- `VITE_TELEGRAM_BOT_TOKEN` - для старой части проекта
-- `VITE_TELEGRAM_CHAT_ID` - для старой части проекта
-- `VITE_API_BASE_URL` - для старой части проекта
 
 ---
 
@@ -154,7 +121,7 @@ VITE_API_BASE_URL=/api
 ### Supabase:
 1. Перейдите в [Supabase Dashboard](https://app.supabase.com)
 2. Выберите проект
-3. Settings → API → скопируйте `URL`, `service_role key` и `anon key`
+3. Settings → API → скопируйте `URL` и `service_role key`
 
 ### Encryption Key:
 ```bash
@@ -181,12 +148,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | `TELEGRAM_BOT_TOKEN` | Серверная | ✅ Да | Next.js |
 | `TELEGRAM_GROUP_CHAT_ID` | Серверная | ⚠️ Опционально | Next.js |
 | `TELEGRAM_ADMIN_CHAT_ID` | Серверная | ⚠️ Опционально | Next.js |
-| `VITE_TELEGRAM_BOT_TOKEN` | Клиентская | ⚠️ Опционально | Vite |
-| `VITE_TELEGRAM_CHAT_ID` | Клиентская | ⚠️ Опционально | Vite |
-| `VITE_API_BASE_URL` | Клиентская | ⚠️ Опционально | Vite |
 | `SUPABASE_URL` | Серверная | ⚠️ Опционально | Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Серверная | ⚠️ Опционально | Supabase |
-| `SUPABASE_ANON_KEY` | Клиентская | ⚠️ Опционально | Supabase |
 | `ENCRYPTION_KEY` | Серверная | ⚠️ Опционально | Шифрование |
 
 ---
