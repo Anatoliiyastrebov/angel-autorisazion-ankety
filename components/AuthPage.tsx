@@ -27,92 +27,119 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
 
     setIsChecking(true)
 
-    // Проверяем, если открыто из Telegram Web App
-    if (window.Telegram?.WebApp) {
-      const webApp = window.Telegram.WebApp
-      
-      try {
-        webApp.ready()
-        webApp.expand()
-      } catch (e) {
-        // Игнорируем ошибки
-      }
-
-      const webAppUser = webApp.initDataUnsafe?.user
-      const initData = webApp.initDataUnsafe
-
-      if (webAppUser && initData?.auth_date && initData?.hash) {
-        console.log('✅ Telegram Web App: данные пользователя найдены')
-        const user: TelegramUser = {
-          id: webAppUser.id,
-          first_name: webAppUser.first_name,
-          last_name: webAppUser.last_name,
-          username: webAppUser.username,
-          photo_url: webAppUser.photo_url,
-          auth_date: initData.auth_date,
-          hash: initData.hash,
-          initData: webApp.initData,
-        }
+    // Ждем загрузки Telegram Web App скрипта
+    const checkWebApp = () => {
+      // Проверяем, если открыто из Telegram Web App
+      if (window.Telegram?.WebApp) {
+        const webApp = window.Telegram.WebApp
         
-        // Сохраняем в localStorage
-        localStorage.setItem('telegram_user', JSON.stringify(user))
-        
-        // Вызываем callback
-        onAuth(user)
-        setIsChecking(false)
-        return
-      }
-
-      // Попробуем получить данные из initData строки
-      if (webApp.initData) {
         try {
-          const params = new URLSearchParams(webApp.initData)
-          const userParam = params.get('user')
-          if (userParam) {
-            const userData = JSON.parse(decodeURIComponent(userParam))
-            console.log('✅ Найдены данные пользователя в initData:', userData)
-            
-            const user: TelegramUser = {
-              id: userData.id,
-              first_name: userData.first_name,
-              last_name: userData.last_name,
-              username: userData.username,
-              photo_url: userData.photo_url,
-              auth_date: parseInt(params.get('auth_date') || '0'),
-              hash: params.get('hash') || '',
-              initData: webApp.initData,
-            }
-            
-            if (user.id && user.first_name) {
-              localStorage.setItem('telegram_user', JSON.stringify(user))
-              onAuth(user)
-              setIsChecking(false)
-              return
-            }
+          // Инициализируем Web App
+          webApp.ready()
+          webApp.expand()
+          
+          // Настраиваем тему
+          if (webApp.themeParams) {
+            document.documentElement.style.setProperty('--tg-theme-bg-color', webApp.themeParams.bg_color || '#ffffff')
+            document.documentElement.style.setProperty('--tg-theme-text-color', webApp.themeParams.text_color || '#000000')
           }
-        } catch (error) {
-          console.error('❌ Ошибка при парсинге initData:', error)
+        } catch (e) {
+          console.warn('⚠️ Ошибка при инициализации Web App:', e)
         }
-      }
-    }
 
-    // Проверяем, есть ли сохраненные данные
-    const savedUser = localStorage.getItem('telegram_user')
-    if (savedUser) {
-      try {
-        const user = JSON.parse(savedUser)
-        if (user.id && user.first_name) {
-          console.log('✅ Найдены сохраненные данные пользователя')
+        const webAppUser = webApp.initDataUnsafe?.user
+        const initData = webApp.initDataUnsafe
+
+        // Приоритет 1: Данные из initDataUnsafe (самый надежный способ)
+        if (webAppUser && initData?.auth_date && initData?.hash) {
+          console.log('✅ Telegram Web App: данные пользователя найдены через initDataUnsafe')
+          const user: TelegramUser = {
+            id: webAppUser.id,
+            first_name: webAppUser.first_name,
+            last_name: webAppUser.last_name,
+            username: webAppUser.username,
+            photo_url: webAppUser.photo_url,
+            auth_date: initData.auth_date,
+            hash: initData.hash,
+            initData: webApp.initData,
+          }
+          
+          // Сохраняем в localStorage
+          localStorage.setItem('telegram_user', JSON.stringify(user))
+          
+          // Вызываем callback
           onAuth(user)
           setIsChecking(false)
-          return
+          return true
         }
-      } catch (e) {
-        localStorage.removeItem('telegram_user')
+
+        // Приоритет 2: Парсим initData строку
+        if (webApp.initData) {
+          try {
+            const params = new URLSearchParams(webApp.initData)
+            const userParam = params.get('user')
+            if (userParam) {
+              const userData = JSON.parse(decodeURIComponent(userParam))
+              console.log('✅ Найдены данные пользователя в initData:', userData)
+              
+              const user: TelegramUser = {
+                id: userData.id,
+                first_name: userData.first_name,
+                last_name: userData.last_name,
+                username: userData.username,
+                photo_url: userData.photo_url,
+                auth_date: parseInt(params.get('auth_date') || '0'),
+                hash: params.get('hash') || '',
+                initData: webApp.initData,
+              }
+              
+              if (user.id && user.first_name) {
+                localStorage.setItem('telegram_user', JSON.stringify(user))
+                onAuth(user)
+                setIsChecking(false)
+                return true
+              }
+            }
+          } catch (error) {
+            console.error('❌ Ошибка при парсинге initData:', error)
+          }
+        }
       }
+      return false
     }
 
-    setIsChecking(false)
+    // Проверяем сразу, если скрипт уже загружен
+    if (checkWebApp()) {
+      return
+    }
+
+    // Если скрипт еще не загружен, ждем его загрузки
+    let attempts = 0
+    const maxAttempts = 10
+    const checkInterval = setInterval(() => {
+      attempts++
+      if (checkWebApp() || attempts >= maxAttempts) {
+        clearInterval(checkInterval)
+        if (attempts >= maxAttempts) {
+          // Проверяем сохраненные данные, если Web App не доступен
+          const savedUser = localStorage.getItem('telegram_user')
+          if (savedUser) {
+            try {
+              const user = JSON.parse(savedUser)
+              if (user.id && user.first_name) {
+                console.log('✅ Найдены сохраненные данные пользователя')
+                onAuth(user)
+                setIsChecking(false)
+                return
+              }
+            } catch (e) {
+              localStorage.removeItem('telegram_user')
+            }
+          }
+          setIsChecking(false)
+        }
+      }
+    }, 100)
   }
 
   const handleTelegramAuth = (user: TelegramUser) => {
@@ -169,7 +196,25 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
           )}
         </div>
 
-        {typeof window !== 'undefined' && window.Telegram?.WebApp && (
+        {typeof window !== 'undefined' && window.Telegram?.WebApp ? (
+          <div style={{ 
+            marginTop: '2rem', 
+            padding: '1rem', 
+            background: '#d1ecf1', 
+            borderRadius: '8px',
+            fontSize: '0.9rem',
+            color: '#0c5460',
+            textAlign: 'center',
+            border: '1px solid #bee5eb'
+          }}>
+            <p style={{ margin: 0, fontWeight: 500 }}>
+              ✅ Открыто через Telegram Web App
+            </p>
+            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem' }}>
+              Авторизация должна произойти автоматически. Если этого не произошло, используйте кнопку выше.
+            </p>
+          </div>
+        ) : (
           <div style={{ 
             marginTop: '2rem', 
             padding: '1rem', 
@@ -177,10 +222,14 @@ export default function AuthPage({ onAuth }: AuthPageProps) {
             borderRadius: '8px',
             fontSize: '0.9rem',
             color: '#856404',
-            textAlign: 'center'
+            textAlign: 'center',
+            border: '1px solid #ffeaa7'
           }}>
-            <p style={{ margin: 0 }}>
-              💡 Вы открыли сайт из Telegram. Если авторизация не произошла автоматически, используйте кнопку выше.
+            <p style={{ margin: 0, fontWeight: 500 }}>
+              💡 Рекомендуется открыть сайт через Telegram бота
+            </p>
+            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem' }}>
+              Для автоматической авторизации откройте сайт через кнопку в боте или меню бота.
             </p>
           </div>
         )}
