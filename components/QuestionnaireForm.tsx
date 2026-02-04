@@ -61,27 +61,40 @@ export default function QuestionnaireForm({
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    let isMounted = true
+    let webAppInitialized = false
+
     // Ждем, пока Telegram Web App полностью инициализируется
     const checkTelegramWebApp = () => {
+      if (!isMounted) return
+      
       if (!window.Telegram?.WebApp) {
         console.log('ℹ️ Telegram Web App не обнаружен')
         return
       }
 
       const webApp = window.Telegram.WebApp
-      webApp.ready()
-      webApp.expand()
+      
+      // Вызываем ready и expand только один раз
+      if (!webAppInitialized) {
+        try {
+          webApp.ready()
+          webApp.expand()
+          webAppInitialized = true
+        } catch (e) {
+          // Игнорируем ошибки, если уже вызвано
+        }
+      }
 
       console.log('🔍 Проверка данных Telegram Web App:', {
         hasWebApp: !!window.Telegram?.WebApp,
         hasInitDataUnsafe: !!webApp.initDataUnsafe,
         hasUser: !!webApp.initDataUnsafe?.user,
-        initDataUnsafe: webApp.initDataUnsafe,
         initData: webApp.initData ? 'present' : 'missing',
       })
 
       // Сначала проверяем, если открыто напрямую из Telegram Web App
-      if (webApp.initDataUnsafe?.user && !telegramUser) {
+      if (webApp.initDataUnsafe?.user && !telegramUser && isMounted) {
         const webAppUser = webApp.initDataUnsafe.user
         const initData = webApp.initDataUnsafe
 
@@ -91,7 +104,7 @@ export default function QuestionnaireForm({
           hash: initData?.hash ? 'present' : 'missing',
         })
 
-        if (webAppUser && initData?.auth_date && initData?.hash) {
+        if (webAppUser && initData?.auth_date && initData?.hash && isMounted) {
           console.log('✅ Telegram Web App: загружаю данные пользователя')
           const user = {
             id: webAppUser.id,
@@ -104,18 +117,20 @@ export default function QuestionnaireForm({
             initData: webApp.initData,
           }
 
-          setTelegramUser(user)
-          // Заполняем имя и фамилию из Telegram автоматически
-          setAnswers(prev => {
-            const newAnswers = { ...prev }
-            if (user.first_name && !newAnswers.first_name) {
-              newAnswers.first_name = user.first_name
-            }
-            if (user.last_name && !newAnswers.last_name) {
-              newAnswers.last_name = user.last_name
-            }
-            return newAnswers
-          })
+          if (isMounted) {
+            setTelegramUser(user)
+            // Заполняем имя и фамилию из Telegram автоматически
+            setAnswers(prev => {
+              const newAnswers = { ...prev }
+              if (user.first_name && !newAnswers.first_name) {
+                newAnswers.first_name = user.first_name
+              }
+              if (user.last_name && !newAnswers.last_name) {
+                newAnswers.last_name = user.last_name
+              }
+              return newAnswers
+            })
+          }
           return
         } else {
           console.warn('⚠️ Telegram Web App обнаружен, но данные пользователя неполные:', {
@@ -128,13 +143,13 @@ export default function QuestionnaireForm({
         console.log('ℹ️ Telegram Web App detected but user data not available')
         
         // Попробуем получить данные из initData строки напрямую
-        if (webApp.initData) {
+        if (webApp.initData && isMounted) {
           console.log('🔍 Пытаюсь парсить initData строку:', webApp.initData.substring(0, 100))
           try {
             // Парсим initData строку (формат: key=value&key2=value2)
             const params = new URLSearchParams(webApp.initData)
             const userParam = params.get('user')
-            if (userParam) {
+            if (userParam && isMounted) {
               const userData = JSON.parse(decodeURIComponent(userParam))
               console.log('✅ Найдены данные пользователя в initData:', userData)
               
@@ -149,7 +164,7 @@ export default function QuestionnaireForm({
                 initData: webApp.initData,
               }
               
-              if (user.id && user.first_name) {
+              if (user.id && user.first_name && isMounted) {
                 setTelegramUser(user)
                 setAnswers(prev => {
                   const newAnswers = { ...prev }
@@ -175,9 +190,14 @@ export default function QuestionnaireForm({
     checkTelegramWebApp()
 
     // Также проверяем после небольшой задержки, на случай если Web App еще загружается
-    const timeoutId = setTimeout(checkTelegramWebApp, 500)
+    const timeoutId = setTimeout(() => {
+      if (isMounted) {
+        checkTelegramWebApp()
+      }
+    }, 500)
     
     return () => {
+      isMounted = false
       clearTimeout(timeoutId)
     }
 
