@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
 
       // Отправляем в группу напрямую через Telegram API
       // Если группа была преобразована в супергруппу, используем migrate_to_chat_id из ошибки
-      let groupChatId = process.env.TELEGRAM_GROUP_CHAT_ID || '-1003533385546'
+      let groupChatId = process.env.TELEGRAM_GROUP_CHAT_ID || '-5074397630'
       console.log('📤 Отправляю сообщение в группу:', groupChatId)
       let groupSent = false
       let attempts = 0
