@@ -118,12 +118,15 @@ function QuestionnaireFormContent({
     // Проверяем параметр авторизации из URL (возврат после авторизации через бота)
     const authConfirmed = searchParams.get('auth')
     if (authConfirmed === 'confirmed') {
+      console.log('✅ Авторизация подтверждена, загружаем данные пользователя...')
       // Даем задержку для сохранения данных из Web App
       setTimeout(() => {
         loadUserData()
         // Очищаем параметр из URL
-        window.history.replaceState({}, '', window.location.pathname)
-      }, 200)
+        const newUrl = window.location.pathname
+        window.history.replaceState({}, '', newUrl)
+        console.log('✅ URL очищен, остаемся на странице анкеты')
+      }, 300)
     } else {
       loadUserData()
     }
@@ -135,6 +138,7 @@ function QuestionnaireFormContent({
       try {
         const user = JSON.parse(savedUser)
         if (user.id && user.first_name) {
+          console.log('✅ Данные пользователя загружены из localStorage:', user)
           setTelegramUser(user)
           
           // Автоматически заполняем имя и фамилию из Telegram
@@ -142,17 +146,23 @@ function QuestionnaireFormContent({
             const newAnswers = { ...prev }
             if (user.first_name && !newAnswers.first_name) {
               newAnswers.first_name = user.first_name
+              console.log('✅ Автозаполнение: имя =', user.first_name)
             }
             if (user.last_name && !newAnswers.last_name) {
               newAnswers.last_name = user.last_name
+              console.log('✅ Автозаполнение: фамилия =', user.last_name)
             }
             return newAnswers
           })
+        } else {
+          console.warn('⚠️ Данные пользователя неполные:', user)
         }
       } catch (e) {
-        console.error('Ошибка при загрузке данных пользователя:', e)
+        console.error('❌ Ошибка при загрузке данных пользователя:', e)
         localStorage.removeItem('telegram_user')
       }
+    } else {
+      console.log('ℹ️ Данные пользователя не найдены в localStorage')
     }
   }
 
@@ -359,14 +369,25 @@ function QuestionnaireFormContent({
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <button
                   onClick={() => {
+                    // Сохраняем текущий URL анкеты для возврата после авторизации
+                    if (typeof window !== 'undefined') {
+                      const currentUrl = window.location.pathname + window.location.search
+                      localStorage.setItem('return_url', currentUrl)
+                      console.log('💾 Сохранен URL для возврата:', currentUrl)
+                    }
+                    
                     // Открываем бота через Menu Button (если доступен) или через ссылку
                     if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
                       // Если открыто в Web App, используем Menu Button
                       const webApp = window.Telegram.WebApp
-                      webApp.openTelegramLink(`https://t.me/${botName}`)
+                      // Передаем return_url как параметр
+                      const returnUrl = encodeURIComponent(window.location.pathname + window.location.search)
+                      const botUrl = `https://t.me/${botName}?start=auth_${Date.now()}`
+                      webApp.openTelegramLink(botUrl)
                     } else {
                       // Иначе открываем в новой вкладке
-                      const botUrl = `https://t.me/${botName}`
+                      const returnUrl = encodeURIComponent(window.location.pathname + window.location.search)
+                      const botUrl = `https://t.me/${botName}?start=auth_${Date.now()}`
                       window.open(botUrl, '_blank')
                       alert('Откройте бота и нажмите кнопку "Авторизоваться" внизу экрана, затем вернитесь на эту страницу.')
                     }

@@ -112,16 +112,34 @@ function AuthConfirmContent() {
       }
       console.log('✅ Данные успешно сохранены в localStorage')
 
+      // Получаем URL для возврата из localStorage
+      const returnUrl = typeof window !== 'undefined' 
+        ? localStorage.getItem('return_url') 
+        : null
+      
+      // Если есть сохраненный URL, возвращаемся на него, иначе на главную
+      const redirectUrl = returnUrl 
+        ? `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}auth=confirmed`
+        : '/?auth=confirmed'
+      
+      console.log('🔗 URL для возврата:', returnUrl || 'главная страница')
+      console.log('🔗 Полный URL редиректа:', redirectUrl)
+      
       // Если открыто в Telegram Web App
       if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
         const webApp = window.Telegram.WebApp
         
         // Показываем уведомление об успехе
-        webApp.showAlert('✅ Авторизация успешна! Вы будете перенаправлены на сайт.', () => {
+        webApp.showAlert('✅ Авторизация успешна! Вы будете перенаправлены обратно в анкету.', () => {
           // Открываем сайт в браузере с параметром auth=confirmed
-          const siteUrl = `${window.location.origin}/?auth=confirmed`
+          const siteUrl = `${window.location.origin}${redirectUrl}`
           console.log('🔗 Открываем сайт:', siteUrl)
           webApp.openLink(siteUrl, { try_instant_view: false })
+          
+          // Очищаем сохраненный URL
+          if (returnUrl) {
+            localStorage.removeItem('return_url')
+          }
           
           // Закрываем Web App через небольшую задержку
           setTimeout(() => {
@@ -132,8 +150,11 @@ function AuthConfirmContent() {
         })
       } else {
         // Если не в Web App, просто перенаправляем
-        console.log('🔗 Перенаправление на главную страницу с auth=confirmed')
-        router.push('/?auth=confirmed')
+        console.log('🔗 Перенаправление на:', redirectUrl)
+        if (returnUrl) {
+          localStorage.removeItem('return_url')
+        }
+        router.push(redirectUrl)
       }
     } catch (error) {
       console.error('❌ Ошибка при подтверждении:', error)
