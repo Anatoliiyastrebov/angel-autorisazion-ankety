@@ -22,15 +22,6 @@
 
 ---
 
-### 🟡 Supabase (для хранения данных)
-
-| Переменная | Описание | Обязательная | Где используется |
-|------------|----------|--------------|------------------|
-| `SUPABASE_URL` | URL проекта Supabase | ⚠️ Опционально | `api/questionnaires/save.ts`, `api/questionnaires/get.ts`, `api/questionnaires/delete.ts`, `api/auth/send-otp.ts`, `api/auth/verify-otp.ts`, `api/gdpr/create-request.ts`, `supabase/functions/delete_old_profiles/index.ts` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service Role Key из Supabase | ⚠️ Опционально | Те же файлы, что и `SUPABASE_URL` |
-
----
-
 ### 🔴 Шифрование
 
 | Переменная | Описание | Обязательная | Где используется |
@@ -65,17 +56,6 @@ TELEGRAM_GROUP_CHAT_ID=-5074397630
 TELEGRAM_ADMIN_CHAT_ID=your_chat_id_here
 
 # ============================================
-# SUPABASE CONFIGURATION (опционально)
-# ============================================
-
-# URL проекта Supabase
-SUPABASE_URL=https://your-project.supabase.co
-
-# Service Role Key из Supabase
-# ⚠️ ВАЖНО: Никогда не публикуйте этот ключ!
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
-
-# ============================================
 # ENCRYPTION (опционально)
 # ============================================
 
@@ -98,8 +78,6 @@ ENCRYPTION_KEY=your_32_byte_hex_key_here
 ### Опциональные переменные:
 
 - `TELEGRAM_ADMIN_CHAT_ID` - для уведомлений администратору
-- `SUPABASE_URL` - если используется Supabase
-- `SUPABASE_SERVICE_ROLE_KEY` - если используется Supabase
 - `ENCRYPTION_KEY` - если используется шифрование
 
 ---
@@ -121,11 +99,6 @@ ENCRYPTION_KEY=your_32_byte_hex_key_here
 2. Отправьте любое сообщение в группу
 3. Бот вернет `chat_id` группы
 
-### Supabase:
-1. Перейдите в [Supabase Dashboard](https://app.supabase.com)
-2. Выберите проект
-3. Settings → API → скопируйте `URL` и `service_role key`
-
 ### Encryption Key:
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -137,7 +110,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 1. **Никогда не коммитьте `.env.local` в репозиторий!**
 2. **`NEXT_PUBLIC_*` переменные встраиваются в клиентский код** - не храните там секреты!
-3. **`TELEGRAM_BOT_TOKEN` и `SUPABASE_SERVICE_ROLE_KEY`** - это секреты, храните их только на сервере
+3. **`TELEGRAM_BOT_TOKEN`** - это секрет, храните его только на сервере
 4. **После добавления переменных на Vercel** - обязательно пересоберите проект!
 
 ---
