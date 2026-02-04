@@ -68,10 +68,10 @@ function HomeContent() {
   }
 
   const questionnaires = [
+    { path: '/questionnaire/baby', name: 'Анкета для малыша' },
+    { path: '/questionnaire/child', name: 'Детская анкета' },
     { path: '/questionnaire/women', name: 'Женская анкета' },
     { path: '/questionnaire/men', name: 'Мужская анкета' },
-    { path: '/questionnaire/basic', name: 'Базовая анкета' },
-    { path: '/questionnaire/extended', name: 'Расширенная анкета' },
   ]
 
   if (isLoading) {
@@ -113,6 +113,28 @@ function HomeContent() {
               key={q.path}
               href={q.path}
               className="questionnaire-link"
+              style={{
+                display: 'block',
+                padding: '1.5rem',
+                background: '#f8f9fa',
+                border: '2px solid #0088cc',
+                borderRadius: '12px',
+                textDecoration: 'none',
+                color: '#333',
+                fontSize: '1.1rem',
+                fontWeight: 500,
+                textAlign: 'center',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#e7f3ff'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f8f9fa'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
             >
               {q.name}
             </Link>

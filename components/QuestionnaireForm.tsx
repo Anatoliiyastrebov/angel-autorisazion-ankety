@@ -9,29 +9,46 @@ interface QuestionnaireFormProps {
   questionnaireType: string
 }
 
-// Вопросы для разных типов анкет
+// Вопросы для разных типов анкет - личные данные
 const questionnaireQuestions: Record<string, Array<{ id: string; label: string; type: 'text' | 'textarea' | 'number' | 'select'; options?: string[] }>> = {
+  baby: [
+    { id: 'first_name', label: 'Имя', type: 'text' },
+    { id: 'last_name', label: 'Фамилия', type: 'text' },
+    { id: 'age', label: 'Возраст (месяцы)', type: 'number' },
+    { id: 'date_of_birth', label: 'Дата рождения', type: 'text' },
+    { id: 'phone', label: 'Телефон родителя', type: 'text' },
+    { id: 'address', label: 'Адрес проживания', type: 'textarea' },
+    { id: 'parent_name', label: 'Имя родителя/опекуна', type: 'text' },
+  ],
+  child: [
+    { id: 'first_name', label: 'Имя', type: 'text' },
+    { id: 'last_name', label: 'Фамилия', type: 'text' },
+    { id: 'age', label: 'Возраст (лет)', type: 'number' },
+    { id: 'date_of_birth', label: 'Дата рождения', type: 'text' },
+    { id: 'phone', label: 'Телефон', type: 'text' },
+    { id: 'address', label: 'Адрес проживания', type: 'textarea' },
+    { id: 'school', label: 'Школа/Учебное заведение', type: 'text' },
+    { id: 'parent_name', label: 'Имя родителя/опекуна', type: 'text' },
+  ],
   women: [
     { id: 'first_name', label: 'Имя', type: 'text' },
     { id: 'last_name', label: 'Фамилия', type: 'text' },
+    { id: 'age', label: 'Возраст', type: 'number' },
+    { id: 'date_of_birth', label: 'Дата рождения', type: 'text' },
+    { id: 'phone', label: 'Телефон', type: 'text' },
+    { id: 'email', label: 'Email', type: 'text' },
+    { id: 'address', label: 'Адрес проживания', type: 'textarea' },
     { id: 'height', label: 'Рост (см)', type: 'number' },
     { id: 'weight', label: 'Вес (кг)', type: 'number' },
   ],
   men: [
     { id: 'first_name', label: 'Имя', type: 'text' },
     { id: 'last_name', label: 'Фамилия', type: 'text' },
-    { id: 'height', label: 'Рост (см)', type: 'number' },
-    { id: 'weight', label: 'Вес (кг)', type: 'number' },
-  ],
-  basic: [
-    { id: 'first_name', label: 'Имя', type: 'text' },
-    { id: 'last_name', label: 'Фамилия', type: 'text' },
-    { id: 'height', label: 'Рост (см)', type: 'number' },
-    { id: 'weight', label: 'Вес (кг)', type: 'number' },
-  ],
-  extended: [
-    { id: 'first_name', label: 'Имя', type: 'text' },
-    { id: 'last_name', label: 'Фамилия', type: 'text' },
+    { id: 'age', label: 'Возраст', type: 'number' },
+    { id: 'date_of_birth', label: 'Дата рождения', type: 'text' },
+    { id: 'phone', label: 'Телефон', type: 'text' },
+    { id: 'email', label: 'Email', type: 'text' },
+    { id: 'address', label: 'Адрес проживания', type: 'textarea' },
     { id: 'height', label: 'Рост (см)', type: 'number' },
     { id: 'weight', label: 'Вес (кг)', type: 'number' },
   ],
@@ -271,6 +288,16 @@ export default function QuestionnaireForm({
                     value={answers[question.id] || ''}
                     onChange={(e) => handleInputChange(question.id, e.target.value)}
                     required
+                    style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', border: '1px solid #ddd', borderRadius: '4px' }}
+                  />
+                ) : question.type === 'textarea' ? (
+                  <textarea
+                    id={question.id}
+                    value={answers[question.id] || ''}
+                    onChange={(e) => handleInputChange(question.id, e.target.value)}
+                    required
+                    rows={3}
+                    style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', border: '1px solid #ddd', borderRadius: '4px', fontFamily: 'inherit', resize: 'vertical' }}
                   />
                 ) : (
                   <input
@@ -279,6 +306,7 @@ export default function QuestionnaireForm({
                     value={answers[question.id] || ''}
                     onChange={(e) => handleInputChange(question.id, e.target.value)}
                     required
+                    style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', border: '1px solid #ddd', borderRadius: '4px' }}
                   />
                 )}
               </div>
