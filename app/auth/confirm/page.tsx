@@ -146,11 +146,15 @@ function AuthConfirmContent() {
           console.log('📡 Получение данных пользователя через API')
           fetchUserData(token, userId)
         } else {
-          console.warn('⚠️ Нет данных для авторизации. Убедитесь, что открыто через Menu Button бота.')
+          console.warn('⚠️ Нет данных для авторизации в Web App.')
+          console.warn('⚠️ Эта страница должна открываться через Menu Button бота.')
+          console.warn('⚠️ Если вы открыли эту страницу напрямую, закройте её и используйте кнопку "Авторизоваться" в боте.')
         }
       }
     } else {
-      console.warn('⚠️ Web App не обнаружен. Убедитесь, что открыто через Telegram бота.')
+      console.warn('⚠️ Telegram Web App не обнаружен.')
+      console.warn('⚠️ Эта страница работает только при открытии через Telegram бота.')
+      console.warn('⚠️ Пожалуйста, откройте бота и нажмите кнопку "Авторизоваться" внизу экрана.')
     }
   }, [searchParams])
 
@@ -337,14 +341,89 @@ function AuthConfirmContent() {
     }
   }
 
+  // Получаем имя бота для инструкции
+  const botName = typeof window !== 'undefined' 
+    ? process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || 'telega_automat_bot'
+    : 'telega_automat_bot'
+
   if (!isAuthorized || !userData) {
     return (
       <div className="container">
         <div className="card">
-          <h1>Авторизация</h1>
-          <p style={{ color: '#666', marginTop: '1rem', textAlign: 'center' }}>
-            Загрузка данных из Telegram...
-          </p>
+          <h1 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>🔐 Авторизация</h1>
+          
+          {typeof window !== 'undefined' && window.Telegram?.WebApp ? (
+            // Если открыто через Web App, но данных нет
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ color: '#666', marginBottom: '1rem' }}>
+                Загрузка данных из Telegram...
+              </p>
+              <p style={{ color: '#999', fontSize: '0.9rem' }}>
+                Если данные не загружаются, попробуйте закрыть и открыть заново через Menu Button бота.
+              </p>
+            </div>
+          ) : (
+            // Если открыто в обычном браузере
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ 
+                padding: '1.5rem', 
+                background: '#fff3cd', 
+                borderRadius: '8px', 
+                marginBottom: '1.5rem',
+                border: '1px solid #ffc107'
+              }}>
+                <p style={{ color: '#856404', margin: 0, fontWeight: 500, fontSize: '1.1rem' }}>
+                  ⚠️ Эта страница работает только через Telegram
+                </p>
+              </div>
+              
+              <p style={{ color: '#666', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                Для авторизации необходимо открыть эту страницу через Telegram бота.
+              </p>
+              
+              <div style={{ 
+                padding: '1.5rem', 
+                background: '#e7f3ff', 
+                borderRadius: '8px', 
+                marginBottom: '1.5rem',
+                border: '1px solid #0088cc',
+                textAlign: 'left'
+              }}>
+                <p style={{ fontWeight: 500, marginBottom: '1rem', color: '#0088cc' }}>
+                  📋 Инструкция:
+                </p>
+                <ol style={{ margin: 0, paddingLeft: '1.5rem', color: '#333', lineHeight: 1.8 }}>
+                  <li>Откройте Telegram</li>
+                  <li>Найдите бота <strong>@{botName}</strong></li>
+                  <li>Нажмите кнопку <strong>"Авторизоваться"</strong> внизу экрана (Menu Button)</li>
+                  <li>Подтвердите авторизацию</li>
+                  <li>Вернитесь на страницу анкеты</li>
+                </ol>
+              </div>
+              
+              <a 
+                href={`https://t.me/${botName}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-block',
+                  padding: '1rem 2rem',
+                  background: '#0088cc',
+                  color: 'white',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  fontWeight: 500,
+                  fontSize: '1.1rem'
+                }}
+              >
+                🤖 Открыть бота в Telegram
+              </a>
+              
+              <p style={{ color: '#999', fontSize: '0.85rem', marginTop: '1.5rem' }}>
+                После авторизации вернитесь на страницу анкеты - данные загрузятся автоматически.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     )
