@@ -101,6 +101,12 @@ function HomeContent() {
     loadUser()
   }, [searchParams])
 
+  // Определяем мобильное устройство
+  const isMobile = () => {
+    if (typeof window === 'undefined') return false
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  }
+
   // Обработчик авторизации
   const handleAuth = async () => {
     setIsAuthenticating(true)
@@ -123,11 +129,21 @@ function HomeContent() {
       
       // Открываем Web App
       const webAppUrl = `https://t.me/${botName}/app?startapp=${sessionId}`
-      window.open(webAppUrl, '_blank', 'noopener,noreferrer')
+      
+      // На мобильных используем location.href для лучшей совместимости
+      if (isMobile()) {
+        window.location.href = webAppUrl
+      } else {
+        // На десктопе открываем в новой вкладке
+        const newWindow = window.open(webAppUrl, '_blank')
+        if (!newWindow) {
+          // Если popup заблокирован, используем редирект
+          window.location.href = webAppUrl
+        }
+      }
     } catch (error) {
       console.error('❌ Ошибка:', error)
       alert('Ошибка при подготовке авторизации. Попробуйте ещё раз.')
-    } finally {
       setIsAuthenticating(false)
     }
   }
@@ -175,11 +191,12 @@ function HomeContent() {
             
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button
+                type="button"
                 onClick={handleAuth}
                 disabled={isAuthenticating}
                 style={{
-                  padding: '1rem 2rem',
-                  fontSize: '1.1rem',
+                  padding: '16px 32px',
+                  fontSize: '18px',
                   fontWeight: 600,
                   background: isAuthenticating ? '#ccc' : '#0088cc',
                   color: 'white',
@@ -188,7 +205,16 @@ function HomeContent() {
                   cursor: isAuthenticating ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  justifyContent: 'center',
+                  gap: '8px',
+                  minHeight: '56px',
+                  minWidth: '200px',
+                  WebkitTapHighlightColor: 'rgba(0,136,204,0.3)',
+                  touchAction: 'manipulation',
+                  WebkitUserSelect: 'none',
+                  userSelect: 'none',
+                  WebkitAppearance: 'none',
+                  appearance: 'none'
                 }}
               >
                 {isAuthenticating ? (
