@@ -12,42 +12,17 @@ function AuthConfirmContent() {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [userData, setUserData] = useState<TelegramUser | null>(null)
   const [isConfirming, setIsConfirming] = useState(false)
+  const [callbackUrl, setCallbackUrl] = useState<string | null>(null)
+  const [authComplete, setAuthComplete] = useState(false)
 
   useEffect(() => {
-    // Сохраняем URL для возврата, если его еще нет (на случай открытия через Menu Button напрямую)
-    if (typeof window !== 'undefined') {
-      const referrer = document.referrer
-      const currentReturnUrl = localStorage.getItem('return_url')
-      
-      // Если return_url не сохранен, пытаемся определить его из referrer
-      if (!currentReturnUrl && referrer) {
-        try {
-          const referrerUrl = new URL(referrer)
-          // Если referrer с того же домена и это не страница авторизации, сохраняем его
-          if (referrerUrl.origin === window.location.origin && 
-              !referrerUrl.pathname.includes('/auth/')) {
-            localStorage.setItem('return_url', referrerUrl.pathname + referrerUrl.search)
-            console.log('💾 Сохранен URL из referrer для возврата:', referrerUrl.pathname + referrerUrl.search)
-          }
-        } catch (e) {
-          console.warn('⚠️ Не удалось распарсить referrer:', e)
-        }
-      }
-      
-      // Если все еще нет return_url, используем главную страницу как fallback
-      if (!localStorage.getItem('return_url')) {
-        localStorage.setItem('return_url', '/')
-        console.log('💾 Установлен fallback URL (главная страница)')
-      }
-    }
-
     // Проверяем, открыто ли из Telegram Web App
     if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
       const webApp = window.Telegram.WebApp
       webApp.ready()
       webApp.expand()
 
-      // Приоритет 1: Данные из Web App (основной способ при открытии через Menu Button)
+      // Данные из Web App
       const webAppUser = webApp.initDataUnsafe?.user
       const initData = webApp.initDataUnsafe
 
@@ -68,7 +43,6 @@ function AuthConfirmContent() {
         // Валидация данных пользователя
         if (!webAppUser.id || !webAppUser.first_name) {
           console.error('❌ ОШИБКА: Неполные данные пользователя из Web App')
-          console.error('❌ ID:', webAppUser.id, 'Имя:', webAppUser.first_name)
           return
         }
         
@@ -77,30 +51,8 @@ function AuthConfirmContent() {
         const authDate = initData.auth_date
         if (currentTime - authDate > 86400) {
           console.error('❌ ОШИБКА: Данные авторизации устарели (старше 24 часов)')
-          console.error('❌ Текущее время:', currentTime, 'Время авторизации:', authDate)
           return
         }
-        
-        // Проверка hash (базовая проверка наличия)
-        if (!initData.hash || initData.hash.length === 0) {
-          console.error('❌ ОШИБКА: Hash отсутствует или пустой')
-          return
-        }
-        
-        // Проверка initData строки
-        if (!webApp.initData || webApp.initData.length === 0) {
-          console.error('❌ ОШИБКА: initData строка отсутствует или пустая')
-          return
-        }
-        
-        console.log('✅ Валидация данных пройдена:', {
-          id: webAppUser.id,
-          first_name: webAppUser.first_name,
-          hasHash: !!initData.hash,
-          hasInitData: !!webApp.initData,
-          authDate: authDate,
-          age: currentTime - authDate
-        })
         
         const user: TelegramUser = {
           id: webAppUser.id,
@@ -113,77 +65,17 @@ function AuthConfirmContent() {
           initData: webApp.initData,
         }
 
-        // СРАЗУ сохраняем данные в localStorage при обнаружении
-        console.log('💾 Сохранение данных пользователя в localStorage (при обнаружении Web App)...')
-        localStorage.setItem('telegram_user', JSON.stringify(user))
-        
-        // Проверяем сохранение
-        const saved = localStorage.getItem('telegram_user')
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved)
-            if (parsed.id === user.id && parsed.first_name === user.first_name) {
-              console.log('✅ Данные успешно сохранены и проверены в localStorage')
-            } else {
-              console.error('❌ ОШИБКА: Сохраненные данные не совпадают с исходными')
-            }
-          } catch (e) {
-            console.error('❌ ОШИБКА: Не удалось распарсить сохраненные данные:', e)
-          }
-        } else {
-          console.error('❌ ОШИБКА: Не удалось сохранить данные в localStorage')
-        }
-
         setUserData(user)
         setIsAuthorized(true)
-      } 
-      // Приоритет 2: Данные из параметров URL (для обратной совместимости)
-      else {
-        const token = searchParams.get('token')
-        const userId = searchParams.get('user_id')
-        
-        if (token && userId) {
-          console.log('📡 Получение данных пользователя через API')
-          fetchUserData(token, userId)
-        } else {
-          console.warn('⚠️ Нет данных для авторизации в Web App.')
-          console.warn('⚠️ Эта страница должна открываться через Menu Button бота.')
-          console.warn('⚠️ Если вы открыли эту страницу напрямую, закройте её и используйте кнопку "Авторизоваться" в боте.')
-        }
+      } else {
+        console.warn('⚠️ Нет данных для авторизации в Web App.')
+        console.warn('⚠️ Эта страница должна открываться через Menu Button бота.')
       }
     } else {
       console.warn('⚠️ Telegram Web App не обнаружен.')
       console.warn('⚠️ Эта страница работает только при открытии через Telegram бота.')
-      console.warn('⚠️ Пожалуйста, откройте бота и нажмите кнопку "Авторизоваться" внизу экрана.')
     }
   }, [searchParams])
-
-  const fetchUserData = async (token: string, userId: string) => {
-    try {
-      const response = await fetch(`/api/auth/get-user?token=${token}&user_id=${userId}`)
-      if (!response.ok) {
-        throw new Error('Failed to get user data')
-      }
-
-      const userData = await response.json()
-
-      const user: TelegramUser = {
-        id: userData.id,
-        first_name: userData.first_name,
-        last_name: userData.last_name,
-        username: userData.username,
-        photo_url: userData.photo_url,
-        auth_date: Math.floor(Date.now() / 1000),
-        hash: '',
-        initData: '',
-      }
-
-      setUserData(user)
-      setIsAuthorized(true)
-    } catch (error) {
-      console.error('❌ Ошибка при получении данных пользователя:', error)
-    }
-  }
 
   const handleConfirm = async () => {
     if (!userData) return
@@ -191,134 +83,54 @@ function AuthConfirmContent() {
     setIsConfirming(true)
 
     try {
-      // Сохраняем данные в localStorage (если еще не сохранены)
-      console.log('💾 Сохранение данных пользователя в localStorage:', userData)
-      const existingData = localStorage.getItem('telegram_user')
+      // Получаем URL для возврата из localStorage Web App
+      // (сохранен на странице анкеты перед переходом в бота)
+      const returnUrl = localStorage.getItem('return_url') || '/'
+      const questionnaireType = localStorage.getItem('questionnaire_type') || ''
       
-      if (!existingData) {
-        localStorage.setItem('telegram_user', JSON.stringify(userData))
-        console.log('💾 Данные сохранены в localStorage')
-      } else {
-        console.log('ℹ️ Данные уже есть в localStorage, обновляем...')
-        localStorage.setItem('telegram_user', JSON.stringify(userData))
-      }
-      
-      // Проверяем, что данные сохранились
-      const saved = localStorage.getItem('telegram_user')
-      if (!saved) {
-        throw new Error('Не удалось сохранить данные')
-      }
-      
-      // Парсим сохраненные данные для проверки
-      try {
-        const parsed = JSON.parse(saved)
-        console.log('✅ Данные успешно сохранены в localStorage:', {
-          id: parsed.id,
-          first_name: parsed.first_name,
-          username: parsed.username
-        })
-      } catch (e) {
-        console.error('❌ Ошибка при проверке сохраненных данных:', e)
+      console.log('📡 Отправка данных на сервер...', {
+        returnUrl,
+        questionnaireType,
+        userId: userData.id
+      })
+
+      // Отправляем данные на сервер и получаем токен
+      const response = await fetch('/api/auth/save-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userData: {
+            id: userData.id,
+            first_name: userData.first_name,
+            last_name: userData.last_name,
+            username: userData.username,
+            photo_url: userData.photo_url,
+            auth_date: userData.auth_date,
+            hash: userData.hash,
+            initData: userData.initData,
+          },
+          returnUrl,
+          questionnaireType,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Ошибка при сохранении данных')
       }
 
-      // Получаем URL для возврата и тип анкеты из localStorage
-      const returnUrl = typeof window !== 'undefined' 
-        ? localStorage.getItem('return_url') 
-        : null
-      const savedQuestionnaireType = typeof window !== 'undefined'
-        ? localStorage.getItem('questionnaire_type')
-        : null
-      
-      console.log('🔍 Проверка данных в localStorage:', {
-        return_url: returnUrl,
-        questionnaire_type: savedQuestionnaireType,
-        telegram_user: localStorage.getItem('telegram_user') ? 'есть' : 'нет'
-      })
-      
-      // Валидация сохраненного URL
-      let validReturnUrl = returnUrl
-      if (returnUrl) {
-        // Проверяем, что URL валидный (начинается с /)
-        if (!returnUrl.startsWith('/')) {
-          console.warn('⚠️ Некорректный return_url, используем главную страницу')
-          validReturnUrl = '/'
-        }
-        
-        // Проверяем, что это не страница авторизации
-        if (returnUrl.includes('/auth/')) {
-          console.warn('⚠️ return_url указывает на страницу авторизации, используем главную')
-          validReturnUrl = '/'
-        }
-      }
-      
-      // Если есть сохраненный URL, возвращаемся на него, иначе на главную
-      // Убираем параметр auth=confirmed из URL, если он там есть, и добавляем заново
-      let cleanReturnUrl = validReturnUrl || '/'
-      if (cleanReturnUrl.includes('auth=confirmed')) {
-        cleanReturnUrl = cleanReturnUrl.replace(/[?&]auth=confirmed/g, '').replace(/^&/, '?')
-      }
-      
-      const redirectUrl = `${cleanReturnUrl}${cleanReturnUrl.includes('?') ? '&' : '?'}auth=confirmed`
-      
-      console.log('🔗 Исходный URL для возврата:', returnUrl || 'главная страница')
-      console.log('🔗 Валидированный URL:', validReturnUrl || 'главная страница')
-      console.log('🔗 Очищенный URL:', cleanReturnUrl)
-      console.log('🔗 Полный URL редиректа:', redirectUrl)
-      console.log('🔗 Тип анкеты для проверки:', savedQuestionnaireType)
-      
-      // Очищаем сохраненные данные из localStorage ПОСЛЕ использования
-      if (typeof window !== 'undefined') {
-        // Не удаляем сразу, дадим время на редирект
-        setTimeout(() => {
-          if (returnUrl) {
-            localStorage.removeItem('return_url')
-            console.log('🗑️ return_url удален из localStorage')
-          }
-          if (savedQuestionnaireType) {
-            localStorage.removeItem('questionnaire_type')
-            console.log('🗑️ questionnaire_type удален из localStorage')
-          }
-        }, 2000)
-      }
-      
-      // Если открыто в Telegram Web App
-      if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-        const webApp = window.Telegram.WebApp
-        
-        // Дополнительная проверка сохранения данных
-        const finalCheck = localStorage.getItem('telegram_user')
-        if (!finalCheck) {
-          console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: Данные не найдены в localStorage!')
-          // Пытаемся сохранить еще раз
-          localStorage.setItem('telegram_user', JSON.stringify(userData))
-          console.log('💾 Попытка повторного сохранения данных...')
-        } else {
-          console.log('✅ Финальная проверка: данные в localStorage присутствуют')
-        }
-        
-        // Показываем уведомление об успехе
-        // НЕ открываем новую страницу - просто закрываем Web App
-        // Исходная вкладка с анкетой осталась открытой, данные там загрузятся автоматически
-        webApp.showAlert('✅ Авторизация успешна!\n\nВернитесь на вкладку с анкетой - данные загрузятся автоматически.', () => {
-          console.log('🔗 Закрываем Web App, возврат на исходную вкладку...')
-          console.log('ℹ️ Данные сохранены в localStorage, страница анкеты обнаружит их автоматически')
-          
-          // Закрываем Web App - пользователь вернется на исходную вкладку
-          if (webApp.close) {
-            webApp.close()
-          }
-        })
-      } else {
-        // Если не в Web App (открыто в обычном браузере)
-        // Показываем сообщение и предлагаем вернуться на страницу анкеты
-        console.log('ℹ️ Открыто не в Web App, показываем инструкцию')
-        alert('✅ Авторизация успешна!\n\nВернитесь на вкладку с анкетой - данные загрузятся автоматически.')
-        
-        // Очищаем return_url
-        if (returnUrl) {
-          localStorage.removeItem('return_url')
-        }
-      }
+      const result = await response.json()
+      console.log('✅ Данные сохранены на сервере:', result)
+
+      // Сохраняем URL для возврата
+      setCallbackUrl(result.callbackUrl)
+      setAuthComplete(true)
+
+      // Очищаем localStorage
+      localStorage.removeItem('return_url')
+      localStorage.removeItem('questionnaire_type')
+
     } catch (error) {
       console.error('❌ Ошибка при подтверждении:', error)
       setIsConfirming(false)
@@ -334,10 +146,71 @@ function AuthConfirmContent() {
     }
   }
 
+  const handleGoToSite = () => {
+    if (callbackUrl) {
+      // Открываем сайт в браузере (не в Web App)
+      if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+        window.Telegram.WebApp.openLink(callbackUrl, { try_instant_view: false })
+        // Закрываем Web App через небольшую задержку
+        setTimeout(() => {
+          window.Telegram?.WebApp?.close()
+        }, 500)
+      } else {
+        window.location.href = callbackUrl
+      }
+    }
+  }
+
   // Получаем имя бота для инструкции
   const botName = typeof window !== 'undefined' 
     ? process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || 'telega_automat_bot'
     : 'telega_automat_bot'
+
+  // Если авторизация завершена - показываем кнопку для перехода на сайт
+  if (authComplete && callbackUrl) {
+    return (
+      <div className="container">
+        <div className="card">
+          <h1 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>✅ Авторизация успешна!</h1>
+          
+          <div style={{ 
+            padding: '1.5rem', 
+            background: '#d4edda', 
+            borderRadius: '8px', 
+            marginBottom: '1.5rem',
+            border: '1px solid #c3e6cb',
+            textAlign: 'center'
+          }}>
+            <p style={{ color: '#155724', margin: 0, fontSize: '1.1rem' }}>
+              Данные сохранены. Нажмите кнопку ниже, чтобы вернуться к анкете.
+            </p>
+          </div>
+
+          <button
+            onClick={handleGoToSite}
+            style={{
+              width: '100%',
+              padding: '1.25rem',
+              fontSize: '1.2rem',
+              fontWeight: 600,
+              background: '#0088cc',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              marginBottom: '1rem'
+            }}
+          >
+            📋 Вернуться к анкете
+          </button>
+
+          <p style={{ color: '#666', fontSize: '0.9rem', textAlign: 'center' }}>
+            Ваши данные из Telegram будут автоматически подставлены в анкету.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (!isAuthorized || !userData) {
     return (
@@ -390,7 +263,7 @@ function AuthConfirmContent() {
                   <li>Найдите бота <strong>@{botName}</strong></li>
                   <li>Нажмите кнопку <strong>"Авторизоваться"</strong> внизу экрана (Menu Button)</li>
                   <li>Подтвердите авторизацию</li>
-                  <li>Вернитесь на страницу анкеты</li>
+                  <li>Нажмите "Вернуться к анкете"</li>
                 </ol>
               </div>
               
@@ -411,10 +284,6 @@ function AuthConfirmContent() {
               >
                 🤖 Открыть бота в Telegram
               </a>
-              
-              <p style={{ color: '#999', fontSize: '0.85rem', marginTop: '1.5rem' }}>
-                После авторизации вернитесь на страницу анкеты - данные загрузятся автоматически.
-              </p>
             </div>
           )}
         </div>
@@ -542,4 +411,3 @@ export default function AuthConfirmPage() {
     </Suspense>
   )
 }
-
