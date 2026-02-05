@@ -212,15 +212,9 @@ export async function POST(request: NextRequest) {
       let attempts = 0
       const maxAttempts = 2
       
-      // Создаём inline-кнопку для ответа пользователю
+      // Создаём inline-кнопку для открытия профиля пользователя
       const replyKeyboard = {
         inline_keyboard: [
-          [
-            {
-              text: '💬 Ответить пользователю',
-              callback_data: `reply_${userId}`
-            }
-          ],
           [
             {
               text: '📱 Открыть профиль',
