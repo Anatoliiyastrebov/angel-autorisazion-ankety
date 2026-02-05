@@ -15,6 +15,10 @@ declare global {
           }
           auth_date: number
           hash: string
+          start_param?: string  // Данные переданные через ?startapp=
+          query_id?: string
+          chat_type?: string
+          chat_instance?: string
         }
         ready: () => void
         expand: () => void
@@ -105,9 +109,6 @@ declare global {
         onEvent: (eventType: string, eventHandler: () => void) => void
         offEvent: (eventType: string, eventHandler: () => void) => void
         sendData: (data: string) => void
-        ready: () => void
-        expand: () => void
-        close: () => void
       }
     }
   }

@@ -180,16 +180,6 @@ function QuestionnaireFormContent({
   const loadUserData = () => {
     console.log('🔍 Загрузка данных пользователя из localStorage...')
     const savedUser = localStorage.getItem('telegram_user')
-    const savedQuestionnaireType = localStorage.getItem('questionnaire_type')
-    
-    // Проверяем, что тип анкеты совпадает
-    if (savedQuestionnaireType && savedQuestionnaireType !== questionnaireType) {
-      console.warn('⚠️ Тип анкеты не совпадает:', {
-        сохраненный: savedQuestionnaireType,
-        текущий: questionnaireType
-      })
-      // Можно показать предупреждение или перенаправить на правильную анкету
-    }
     
     if (savedUser) {
       try {
@@ -455,40 +445,35 @@ function QuestionnaireFormContent({
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
                 <button
                   onClick={() => {
-                    // Сохраняем текущий URL анкеты и тип анкеты для возврата после авторизации
                     if (typeof window !== 'undefined') {
-                      // Получаем текущий URL без параметра auth=confirmed (если он есть)
+                      // Получаем текущий URL без параметра auth_token (если он есть)
                       const currentPath = window.location.pathname
                       const currentSearch = window.location.search
-                        .replace(/[?&]auth=confirmed/g, '')
+                        .replace(/[?&]auth_token=[^&]*/g, '')
                         .replace(/^&/, '?')
-                        .replace(/^$/, '')
+                        .replace(/^\?$/, '')
                       
                       const currentUrl = currentPath + (currentSearch || '')
                       
-                      // Сохраняем URL анкеты
-                      localStorage.setItem('return_url', currentUrl)
+                      // Кодируем URL возврата и тип анкеты для передачи через startapp
+                      // Формат: returnUrl:questionnaireType (base64)
+                      const dataToEncode = `${currentUrl}|${questionnaireType}`
+                      const encodedData = btoa(encodeURIComponent(dataToEncode))
                       
-                      // Сохраняем тип анкеты для проверки
-                      localStorage.setItem('questionnaire_type', questionnaireType)
-                      
-                      console.log('💾 Сохранены данные для возврата:', {
+                      console.log('💾 Данные для передачи в Web App:', {
                         url: currentUrl,
-                        questionnaireType: questionnaireType
+                        questionnaireType: questionnaireType,
+                        encoded: encodedData
                       })
+                      
+                      // Открываем Web App напрямую с параметром startapp
+                      // Это передаст данные в window.Telegram.WebApp.initDataUnsafe.start_param
+                      const webAppUrl = `https://t.me/${botName}/app?startapp=${encodedData}`
+                      console.log('🔗 Открываем Web App для авторизации:', webAppUrl)
+                      
+                      // Открываем Web App в новой вкладке
+                      window.open(webAppUrl, '_blank', 'noopener,noreferrer')
                     }
-                    
-                    // ВСЕГДА открываем бота - только через Menu Button в боте можно получить данные Telegram
-                    // Страница /auth/confirm работает только как Web App из бота
-                    const botUrl = `https://t.me/${botName}`
-                    console.log('🔗 Открываем бота для авторизации:', botUrl)
-                    console.log('ℹ️ После открытия бота нажмите кнопку "Авторизоваться" внизу экрана')
-                    
-                    // Открываем бота в новой вкладке (текущая остается открытой)
-                    window.open(botUrl, '_blank', 'noopener,noreferrer')
-                    
-                    // Показываем инструкцию
-                    alert('1. Откроется Telegram бот\n2. Нажмите кнопку "Авторизоваться" внизу экрана (Menu Button)\n3. Подтвердите авторизацию\n4. Вернитесь на эту страницу - данные загрузятся автоматически')
                   }}
                   style={{ 
                     padding: '1rem 2rem',
@@ -507,6 +492,9 @@ function QuestionnaireFormContent({
                   <span>🤖</span>
                   <span>Авторизоваться через Telegram</span>
                 </button>
+                <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.5rem', textAlign: 'center' }}>
+                  Откроется Telegram, подтвердите авторизацию и вернитесь на эту страницу
+                </p>
                 </div>
               ) : (
                 <div style={{ padding: '1rem', background: '#fff3cd', borderRadius: '8px', color: '#856404', textAlign: 'center' }}>

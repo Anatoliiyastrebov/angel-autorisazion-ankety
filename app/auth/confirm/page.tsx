@@ -77,16 +77,33 @@ function AuthConfirmContent() {
     }
   }, [searchParams])
 
+  // Получаем данные из start_param (переданы при открытии Web App)
+  const getStartParamData = (): { returnUrl: string; questionnaireType: string } => {
+    try {
+      if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
+        const startParam = window.Telegram.WebApp.initDataUnsafe?.start_param
+        if (startParam) {
+          console.log('🔑 Получен start_param:', startParam)
+          const decoded = decodeURIComponent(atob(startParam))
+          const [returnUrl, questionnaireType] = decoded.split('|')
+          console.log('📋 Декодированные данные:', { returnUrl, questionnaireType })
+          return { returnUrl: returnUrl || '/', questionnaireType: questionnaireType || '' }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Ошибка при декодировании start_param:', error)
+    }
+    return { returnUrl: '/', questionnaireType: '' }
+  }
+
   const handleConfirm = async () => {
     if (!userData) return
 
     setIsConfirming(true)
 
     try {
-      // Получаем URL для возврата из localStorage Web App
-      // (сохранен на странице анкеты перед переходом в бота)
-      const returnUrl = localStorage.getItem('return_url') || '/'
-      const questionnaireType = localStorage.getItem('questionnaire_type') || ''
+      // Получаем URL для возврата из start_param (переданы при открытии Web App)
+      const { returnUrl, questionnaireType } = getStartParamData()
       
       console.log('📡 Отправка данных на сервер...', {
         returnUrl,
@@ -126,10 +143,6 @@ function AuthConfirmContent() {
       // Сохраняем URL для возврата
       setCallbackUrl(result.callbackUrl)
       setAuthComplete(true)
-
-      // Очищаем localStorage
-      localStorage.removeItem('return_url')
-      localStorage.removeItem('questionnaire_type')
 
     } catch (error) {
       console.error('❌ Ошибка при подтверждении:', error)
